@@ -30,4 +30,5 @@ def load_json_file(path):
 def print_dict(dict_file):
     for key in dict_file.keys():
         print("\t {0}: {1}".format(key, dict_file[key]))
+    print()
 

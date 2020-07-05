@@ -5,147 +5,82 @@ import time
 import json
 import random
 
-sys.path.insert(0, './dynamic-gcn')
-from utils import ensure_directory
-from utils import load_json_file
-from utils import save_json_file
+sys.path.insert(0, './dynamic-gcn/')
 from utils import print_dict
-
-
-arg_names = ['command', 'dataset_name', 'snapshot_num']
-args = dict(zip(arg_names, sys.argv))
-dataset_name = args['dataset_name']
-snapshot_num = int(args['snapshot_num'])
-print_dict(args)
+from utils import save_json_file
+from utils import load_json_file
+from utils import ensure_directory
 
 
 # ----------------------
 #     READ ARGUMENTS
 # ----------------------
 
+arg_names = ['command', 'dataset_name', 'snapshot_count']
+args = dict(zip(arg_names, sys.argv))
+dataset = args['dataset_name']
+snapshot_count = int(args['snapshot_count'])
+print_dict(args)
 
 
-if dataset_name in ['Twitter15', 'Twitter16']:
-    dataset_name_lower = dataset_name.lower()
-    RAW_PATH = './data/raw/rumor_detection_acl2017'
-    RAW_LABEL_PATH = '{}/{}/label.txt'.format(RAW_PATH, dataset_name_lower)
-    RAW_TREE_DIR_PATH = '{}/{}/tree/'.format(RAW_PATH, dataset_name_lower)
-    RESOURCE_LABEL_PATH = './resources/{0}_label_All.txt'.format(dataset_name)
-    RESOURCE_TREE_PATH = './resources/data.TD_RvNN.vol_5000.txt'.format(dataset_name)
-elif dataset_name in ['Weibo']:
+
+# -------------
+#     PATHS
+# -------------
+
+paths = {}
+if dataset in ['Twitter15', 'Twitter16']:
+    paths['raw'] = './data/raw/rumor_detection_acl2017/'
+    paths['raw_label'] = os.path.join(paths['raw'], dataset.lower(), 'label.txt')
+    paths['raw_tree'] = os.path.join(paths['raw'], dataset.lower(), 'tree/')
+    paths['resource_label'] = './resources/{0}/{0}_label_all.txt'.format(dataset)
+    paths['resource_tree'] = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset)
+
+    ensure_directory('./data/timestamps/')
+    paths['timestamps'] = './data/timestamps/{}/timestamps.txt'.format(dataset)
+    paths['sequential_snapshots'] = './data/timestamps/{}/sequential_snapshot_{:02}.txt'.format(dataset, snapshot_count)
+    paths['temporal_snapshots'] = './data/timestamps/{}/temporal_snapshot_{:02}.txt'.format(dataset, snapshot_count)
+elif dataset in ['Weibo']:
     exit()
 else:
     exit()
 
-print(RAW_PATH)
-print(RAW_LABEL_PATH)
-print(RAW_TREE_DIR_PATH)
-print(RESOURCE_LABEL_PATH)
-print(RESOURCE_TREE_PATH)
 
 
 
-print()
-exit()
+print_dict(paths)
 
 
 
-if args['dataset_name'] == 'Twitter15':
-    RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter15/label.txt'
-    RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter15/tree/'
-    RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter15/Twitter15_label_All.txt'
-    RESOURCE_TREE_PATH = './resources/BiGCN/Twitter15/data.TD_RvNN.vol_5000.txt'
-elif args['dataset_name'] == 'Twitter16':
-    RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter16/label.txt'
-    RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter16/tree/'
-    RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter16/Twitter16_label_All.txt'
-    RESOURCE_TREE_PATH = './resources/BiGCN/Twitter16/data.TD_RvNN.vol_5000.txt'
-else:
-    exit()
-
-
-"""
-# Twitter 15
-RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter15/label.txt'
-RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter15/tree/'
-RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter15/Twitter15_label_All.txt'
-RESOURCE_TREE_PATH = './resources/BiGCN/Twitter15/data.TD_RvNN.vol_5000.txt'
-"""
-
-"""
-# Twitter 16
-RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter16/label.txt'
-RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter16/tree/'
-RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter16/Twitter16_label_All.txt'
-RESOURCE_TREE_PATH = './resources/BiGCN/Twitter16/data.TD_RvNN.vol_5000.txt'
-
-# OUTPUT FILE
-snapshot_num = 5
-TIMESTAMPS_PATH = './data/sequence/Twitter16/timestamps.txt'
-
-SEQUENCE_SNAPSHOT_PATH = './data/sequence/Twitter16/sequence_snapshot_{:02}.txt'.format(snapshot_num)
-TEMPORAL_SNAPSHOT_PATH = './data/sequence/Twitter16/temporal_snapshot_{:02}.txt'.format(snapshot_num)
-"""
-
-
-# sequential
-
-
-RAW_LABEL_PATH = ""
-RAW_TREE_PATH = ""
-RESOURCE_LABEL_PATH = ""
-RESOURCE_TREE_PATH = ""
-
-TIMESTAMPS_PATH = ""
-SEQUENCE_SNAPSHOT_PATH = ""
-TEMPORAL_SNAPSHOT_PATH = ""
-
-
-TIMESTAMPS_PATH = './data/sequence/{}/timestamps.txt'.format(args['dataset_name'])
-print('./data/sequence/{}/sequence_snapshot_{:02}.txt'.format(args['dataset_name'], int(args['snapshot_num'])))
-print("HERE")
-# TODO: sequence -> sequential
-SEQUENCE_SNAPSHOT_PATH = './data/sequence/{}/sequence_snapshot_{:02}.txt'.format(
-    args['dataset_name'], int(args['snapshot_num']))
-TEMPORAL_SNAPSHOT_PATH = './data/sequence/{}/temporal_snapshot_{:02}.txt'.format(
-    args['dataset_name'], int(args['snapshot_num']))
-
-
-print("RAW_LABEL_PATH:", RAW_LABEL_PATH)
-print("RAW_TREE_PATH:", RAW_TREE_PATH)
-print("RESOURCE_LABEL_PATH:", RESOURCE_LABEL_PATH)
-print("RESOURCE_TREE_PATH:", RESOURCE_TREE_PATH, end='\n\n')
-
-
-def load_raw_labels():
-    # RAW_LABEL_PATH: ./data/raw/rumor_detection_acl2017/twitter16/label.txt
+def load_raw_labels(path):
     id_label_dict = {}
-    label_id_dict = {
-        'true': [], 'false': [], 'unverified': [], 'non-rumor': []
-    }
-    for line in open(RAW_LABEL_PATH):
+    label_id_dict = {'true': [], 'false': [], 'unverified': [], 'non-rumor': []}
+    for line in open(path):
         label, tweet_id = line.strip().split(":")
         id_label_dict[tweet_id] = label
         label_id_dict[label].append(tweet_id)
-    print("{0} {1}".format(RAW_LABEL_PATH, len(id_label_dict)))
+    print("PATH: {0}, LEN: {1}".format(path, len(id_label_dict)))
     print([(key, len(label_id_dict[key])) for key in label_id_dict])
     return id_label_dict, label_id_dict
 
 
-def load_resource_labels():
-    # RESOURCE_LABEL_PATH: ./resources/BiGCN/Twitter16/Twitter16_label_All.txt
+def load_resource_labels(path):
     id_label_dict = {}
-    label_id_dict = {
-        'true': [], 'false': [], 'unverified': [], 'non-rumor': []
-    }
-    for line in open(RESOURCE_LABEL_PATH):
+    label_id_dict = {'true': [], 'false': [], 'unverified': [], 'non-rumor': []}
+    for line in open(path):
         elements = line.strip().split('\t')
-        label, event_id = elements[0], elements[2]  # root_id
+        label, event_id = elements[0], elements[2]
         id_label_dict[event_id] = label
         label_id_dict[label].append(event_id)
-    print("{0} {1}".format(RESOURCE_LABEL_PATH, len(id_label_dict)))
+    print("PATH: {0}, LEN: {1}".format(path, len(id_label_dict)))
     print([(key, len(label_id_dict[key])) for key in label_id_dict])
     return id_label_dict, label_id_dict
+
+
+
+load_raw_labels(paths['raw_label'])
+load_resource_labels(paths['resource_label'])
+exit()
 
 
 def load_resource_trees():
@@ -175,7 +110,7 @@ def load_resource_trees():
 def load_raw_trees():
     pass
 
-# Load Temporal Information - Generate Sequence, Temporal Edge Index
+# Load Temporal Information - Generate Sequential, Temporal Edge Index
 
 
 def raw_tree_to_timestamps():
@@ -327,6 +262,7 @@ def main():
 
     raw_id_label_dict, raw_label_id_dict = load_raw_labels()
     resource_id_label_dict, resource_label_id_dict = load_resource_labels()
+
     resource_trees_dict = load_resource_trees()
     temporal_info = raw_tree_to_timestamps()
     temporal_info = load_json_file(TIMESTAMPS_PATH)
@@ -342,3 +278,57 @@ if __name__ == '__main__':
     end_time = time.time()
     print("\n")
     print("Elapsed Time: {0} seconds".format(round(end_time - start_time, 3)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+# #######################################################################
+
+
+
+if args['dataset_name'] == 'Twitter15':
+    RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter15/label.txt'
+    RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter15/tree/'
+    RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter15/Twitter15_label_All.txt'
+    RESOURCE_TREE_PATH = './resources/BiGCN/Twitter15/data.TD_RvNN.vol_5000.txt'
+elif args['dataset_name'] == 'Twitter16':
+    RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter16/label.txt'
+    RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter16/tree/'
+    RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter16/Twitter16_label_All.txt'
+    RESOURCE_TREE_PATH = './resources/BiGCN/Twitter16/data.TD_RvNN.vol_5000.txt'
+else:
+    exit()
+
+
+"""
+# Twitter 15
+RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter15/label.txt'
+RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter15/tree/'
+RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter15/Twitter15_label_All.txt'
+RESOURCE_TREE_PATH = './resources/BiGCN/Twitter15/data.TD_RvNN.vol_5000.txt'
+"""
+
+"""
+# Twitter 16
+RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter16/label.txt'
+RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter16/tree/'
+RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter16/Twitter16_label_All.txt'
+RESOURCE_TREE_PATH = './resources/BiGCN/Twitter16/data.TD_RvNN.vol_5000.txt'
+
+# OUTPUT FILE
+snapshot_num = 5
+TIMESTAMPS_PATH = './data/sequence/Twitter16/timestamps.txt'
+
+SEQUENCE_SNAPSHOT_PATH = './data/sequence/Twitter16/sequence_snapshot_{:02}.txt'.format(snapshot_num)
+TEMPORAL_SNAPSHOT_PATH = './data/sequence/Twitter16/temporal_snapshot_{:02}.txt'.format(snapshot_num)
+"""
+
