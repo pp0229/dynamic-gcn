@@ -22,5 +22,10 @@ echo "-----------------------------------"
 echo "        DATASET PREPARATION        "
 echo "-----------------------------------"
 
+# Preprocessing
 python ./dynamic-gcn/preparation/preprocess_dataset.py Twitter16 3
+
+
+# Snapshot Generation
+
 
