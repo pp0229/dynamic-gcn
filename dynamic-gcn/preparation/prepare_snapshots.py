@@ -75,7 +75,6 @@ def load_trees(paths, id_label_dict, snapshot_num):
             elements[2])  # None
         # max_degree, max_post_len, word_features = int(elements[3]), int(elements[4]), elements[5]
         _, _, word_features = int(elements[3]), int(elements[4]), elements[5]
-
         if event_id not in id_label_dict:
             continue
         current_snapshot = 0

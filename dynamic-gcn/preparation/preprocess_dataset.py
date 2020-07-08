@@ -202,7 +202,6 @@ def main():
 
     edge_index = sequence_to_snapshot_index(temporal_info, snapshot_num)
     save_json_file(paths['sequential_snapshots'], edge_index)
-
     edge_index = temporal_to_snapshot_index(temporal_info, snapshot_num)
     save_json_file(paths['temporal_snapshots'], edge_index)
 
