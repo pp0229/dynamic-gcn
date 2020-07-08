@@ -12,45 +12,7 @@ from utils import load_json_file
 from utils import ensure_directory
 
 
-# ------------------------------
-#         READ ARGUMENTS
-# ------------------------------
-
-arg_names = ['command', 'dataset_name', 'snapshot_count']
-if len(sys.argv) != 3:
-    print("Please check the arguments.\n")
-    exit()
-args = dict(zip(arg_names, sys.argv))
-dataset, snapshot_count = args['dataset_name'], int(args['snapshot_count'])
-print_dict(args)
-
-
-# ---------------------
-#         PATHS
-# ---------------------
-
-paths = {}
-# ensure_directory('./data/timestamps/')
-
-if dataset in ['Twitter15', 'Twitter16']:
-    paths['raw'] = './data/raw/rumor_detection_acl2017/'
-    paths['raw_label'] = os.path.join(paths['raw'], dataset.lower(), 'label.txt')
-    paths['raw_tree'] = os.path.join(paths['raw'], dataset.lower(), 'tree/')
-    paths['resource_label'] = './resources/{0}/{0}_label_all.txt'.format(dataset)
-    paths['resource_tree'] = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset)
-    paths['timestamps'] = './data/timestamps/{}/timestamps.txt'.format(dataset)
-    paths['timestamps_trim'] = './data/timestamps/{}/timestamps_trim.txt'.format(dataset)
-    paths['sequential_snapshots'] = './data/timestamps/{}/sequential_snapshots_{:02}.txt'.format(dataset, snapshot_count)
-    paths['temporal_snapshots'] = './data/timestamps/{}/temporal_snapshots_{:02}.txt'.format(dataset, snapshot_count)
-elif dataset in ['Weibo']:
-    exit()
-else:
-    exit()
-
-print_dict(paths)
-
-
-def load_raw_labels(path=paths['raw_label']):
+def load_raw_labels(path):
     id_label_dict = {}
     label_id_dict = {
         'true': [], 'false': [], 'unverified': [], 'non-rumor': []
@@ -68,7 +30,7 @@ def load_raw_trees(path):
     pass
 
 
-def load_resource_labels(path=paths['resource_label']):
+def load_resource_labels(path):
     id_label_dict = {}
     label_id_dict = {
         'true': [], 'false': [], 'unverified': [], 'non-rumor': []
@@ -83,7 +45,7 @@ def load_resource_labels(path=paths['resource_label']):
     return id_label_dict, label_id_dict
 
 
-def load_resource_trees(path=paths['resource_tree']):
+def load_resource_trees(path):
     trees_dict = {}
     for line in open(path):
         elements = line.strip().split('\t')
@@ -97,11 +59,11 @@ def load_resource_trees(path=paths['resource_tree']):
             'parent_index': parent_index,
             'word_features': word_features,
         }
-    print('trees count:', len(trees_dict), '\n')
+    print('resource trees count:', len(trees_dict), '\n')
     return trees_dict
 
 
-def raw_tree_to_timestamps(raw_tree_path=paths['raw_tree']):
+def raw_tree_to_timestamps(raw_tree_path, timestamps_path):
     temporal_info = {}
     for file_name in os.listdir(raw_tree_path):
         file_id = file_name[:-4]
@@ -117,7 +79,6 @@ def raw_tree_to_timestamps(raw_tree_path=paths['raw_tree']):
             elif src_post_id != dest_post_id:  # responsive posts
                 temporal_info[file_id].append(max(src_time, dest_time))
         temporal_info[file_id] = sorted(temporal_info[file_id], key=lambda x: float(x.strip()))
-    save_json_file(paths['timestamps'], temporal_info)
     return temporal_info
 
 
@@ -142,126 +103,113 @@ def trim_upsample_temporal_info(temporal_info, resource):
                     upsample.append(random.choice(temporal_info[event_id]))
             temporal_info[event_id] += upsample
             temporal_info[event_id] = sorted(temporal_info[event_id], key=lambda x: float(x.strip()))
-    save_json_file(paths['timestamps_trim'], temporal_info)
     return temporal_info
 
 
 # Load Temporal Information - Generate Sequential, Temporal Edge Index
 
-def sequence_to_snapshot_index(temporal_info):
+def sequence_to_snapshot_index(temporal_info, snapshot_num):
     snapshot_edge_index = {}
     for event_id in temporal_info:
         if event_id not in snapshot_edge_index:
             snapshot_edge_index[event_id] = []
         sequence_len = len(temporal_info[event_id])
-        base_edge_count = sequence_len % snapshot_count
-        additional_edge_count = sequence_len // snapshot_count
-        for snapshot_index in range(1, snapshot_count + 1):
+        base_edge_count = sequence_len % snapshot_num
+        additional_edge_count = sequence_len // snapshot_num
+        for snapshot_index in range(1, snapshot_num + 1):
             count = base_edge_count + additional_edge_count * snapshot_index
             snapshot_edge_index[event_id]
             snapshot_edge_index[event_id].append(count)
-    save_json_file(paths['sequential_snapshots'], snapshot_edge_index)
+    return snapshot_edge_index
 
 
-def temporal_to_snapshot_index(temporal_info):
+def temporal_to_snapshot_index(temporal_info, snapshot_num):
     snapshot_edge_index = {}
     for event_id in temporal_info:
         if event_id not in snapshot_edge_index:
             snapshot_edge_index[event_id] = []
         if not temporal_info[event_id]:
-            snapshot_edge_index[event_id] = [0] * snapshot_count
+            snapshot_edge_index[event_id] = [0] * snapshot_num
             continue
-
         sequence = sorted(temporal_info[event_id], key=lambda x: float(x.strip()))
         sequence = list(map(float, sequence))
-        time_interval = (sequence[-1] - sequence[0]) / snapshot_count
-        for snapshot_index in range(1, snapshot_count + 1):
-            print('\nsnapshot_index', snapshot_index)
+        time_interval = (sequence[-1] - sequence[0]) / snapshot_num
+        for snapshot_index in range(1, snapshot_num + 1):
+            # print('\n snapshot_index', snapshot_index)
             edge_count = 0
             for seq in sequence:
-                print(seq, end=' ')
+                # print(seq, end=' ')
                 if seq <= time_interval * snapshot_index + sequence[0]:
                     edge_count += 1
                 else:
                     break
             snapshot_edge_index[event_id].append(edge_count)
-
         snapshot_edge_index[event_id].pop()
         snapshot_edge_index[event_id].append(len(temporal_info[event_id]))  #
-
-    save_json_file(paths['temporal_snapshots'], snapshot_edge_index)
+    return snapshot_edge_index
 
 
 def main():
+    # ------------------------------
+    #         READ ARGUMENTS
+    # ------------------------------
+    arg_names = ['command', 'dataset_name', 'snapshot_num']
+    if len(sys.argv) != 3:
+        print("Please check the arguments.\n")
+        exit()
+    args = dict(zip(arg_names, sys.argv))
+    dataset, snapshot_num = args['dataset_name'], int(args['snapshot_num'])
+    print_dict(args)
 
-    print("--------------------------------------")
-    print("    RAW DATASET / RESOURCE DATASET    ")
-    print("--------------------------------------")
+    # --------------------------
+    #         INIT PATHS
+    # --------------------------
+    paths = {}
+    if dataset in ['Twitter15', 'Twitter16']:
+        paths['raw'] = './data/raw/rumor_detection_acl2017/'
+        paths['raw_label'] = os.path.join(paths['raw'], dataset.lower(), 'label.txt')
+        paths['raw_tree'] = os.path.join(paths['raw'], dataset.lower(), 'tree/')
+        paths['resource_label'] = './resources/{0}/{0}_label_all.txt'.format(dataset)
+        paths['resource_tree'] = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset)
+        paths['timestamps'] = './data/timestamps/{}/timestamps.txt'.format(dataset)
+        paths['timestamps_trim'] = './data/timestamps/{}/timestamps_trim.txt'.format(dataset)
+        paths['sequential_snapshots'] = './data/timestamps/{}/sequential_snapshots_{:02}.txt'.format(dataset, snapshot_num)
+        paths['temporal_snapshots'] = './data/timestamps/{}/temporal_snapshots_{:02}.txt'.format(dataset, snapshot_num)
+    elif dataset in ['Weibo']:
+        exit()
+    else:
+        exit()
+    print_dict(paths)
 
+    # --------------------------------------
+    #         RAW / RESOURCE DATASET
+    # --------------------------------------
     raw = {
-        'id_label_dict': None, 'label_id_dict': None,
-        'trees_dict': None,
+        'id_label_dict': None, 'label_id_dict': None, 'trees_dict': None,
     }
     resource = {
-        'id_label_dict': None, 'label_id_dict': None,
-        'trees_dict': None,
+        'id_label_dict': None, 'label_id_dict': None, 'trees_dict': None,
     }
+    raw['id_label_dict'], _ = load_raw_labels(paths['raw_label'])
+    resource['id_label_dict'], _ = load_resource_labels(paths['resource_label'])
+    resource['trees_dict'] = load_resource_trees(paths['resource_tree'])
 
-    raw['id_label_dict'], raw['label_id_dict'] = load_raw_labels()
-    resource['id_label_dict'], resource['label_id_dict'] = load_resource_labels()
-    resource['trees_dict'] = load_resource_trees()
-
-    temporal_info = raw_tree_to_timestamps()
-    # temporal_info = load_json_file(TIMESTAMPS_PATH)
+    # temporal_info = load_json_file(paths['timestamps'])  # cache
+    temporal_info = raw_tree_to_timestamps(paths['raw_tree'], paths['timestamps'])
+    save_json_file(paths['timestamps'], temporal_info)
     temporal_info = trim_upsample_temporal_info(temporal_info, resource)
-    sequence_to_snapshot_index(temporal_info)
-    temporal_to_snapshot_index(temporal_info)
+    save_json_file(paths['timestamps_trim'], temporal_info)
+
+    edge_index = sequence_to_snapshot_index(temporal_info, snapshot_num)
+    save_json_file(paths['sequential_snapshots'], edge_index)
+
+    edge_index = temporal_to_snapshot_index(temporal_info, snapshot_num)
+    save_json_file(paths['temporal_snapshots'], edge_index)
 
 
 if __name__ == '__main__':
     start_time = time.time()  # Timer Start
     main()
     end_time = time.time()
-    print("\nElapsed Time: {0} seconds".format(
-        round(end_time - start_time, 3)))
+    print("\nElapsed Time: {0} seconds".format(round(end_time - start_time, 3)))
 
-
-# #######################################################################
-
-
-if args['dataset_name'] == 'Twitter15':
-    RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter15/label.txt'
-    RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter15/tree/'
-    RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter15/Twitter15_label_All.txt'
-    RESOURCE_TREE_PATH = './resources/BiGCN/Twitter15/data.TD_RvNN.vol_5000.txt'
-elif args['dataset_name'] == 'Twitter16':
-    RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter16/label.txt'
-    RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter16/tree/'
-    RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter16/Twitter16_label_All.txt'
-    RESOURCE_TREE_PATH = './resources/BiGCN/Twitter16/data.TD_RvNN.vol_5000.txt'
-else:
-    exit()
-
-
-"""
-# Twitter 15
-RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter15/label.txt'
-RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter15/tree/'
-RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter15/Twitter15_label_All.txt'
-RESOURCE_TREE_PATH = './resources/BiGCN/Twitter15/data.TD_RvNN.vol_5000.txt'
-"""
-
-"""
-# Twitter 16
-RAW_LABEL_PATH = './data/raw/rumor_detection_acl2017/twitter16/label.txt'
-RAW_TREE_PATH = './data/raw/rumor_detection_acl2017/twitter16/tree/'
-RESOURCE_LABEL_PATH = './resources/BiGCN/Twitter16/Twitter16_label_All.txt'
-RESOURCE_TREE_PATH = './resources/BiGCN/Twitter16/data.TD_RvNN.vol_5000.txt'
-
-# OUTPUT FILE
-snapshot_num = 5
-TIMESTAMPS_PATH = './data/sequence/Twitter16/timestamps.txt'
-
-SEQUENCE_SNAPSHOT_PATH = './data/sequence/Twitter16/sequence_snapshot_{:02}.txt'.format(snapshot_num)
-TEMPORAL_SNAPSHOT_PATH = './data/sequence/Twitter16/temporal_snapshot_{:02}.txt'.format(snapshot_num)
-"""
