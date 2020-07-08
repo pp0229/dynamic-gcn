@@ -12,9 +12,9 @@ from utils import load_json_file
 from utils import ensure_directory
 
 
-# ----------------------
-#     READ ARGUMENTS
-# ----------------------
+# ------------------------------
+#         READ ARGUMENTS
+# ------------------------------
 
 arg_names = ['command', 'dataset_name', 'snapshot_count']
 if len(sys.argv) != 3:
@@ -25,9 +25,9 @@ dataset, snapshot_count = args['dataset_name'], int(args['snapshot_count'])
 print_dict(args)
 
 
-# -------------
-#     PATHS
-# -------------
+# ---------------------
+#         PATHS
+# ---------------------
 
 paths = {}
 # ensure_directory('./data/timestamps/')
@@ -39,6 +39,7 @@ if dataset in ['Twitter15', 'Twitter16']:
     paths['resource_label'] = './resources/{0}/{0}_label_all.txt'.format(dataset)
     paths['resource_tree'] = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset)
     paths['timestamps'] = './data/timestamps/{}/timestamps.txt'.format(dataset)
+    paths['timestamps_trim'] = './data/timestamps/{}/timestamps_trim.txt'.format(dataset)
     paths['sequential_snapshots'] = './data/timestamps/{}/sequential_snapshots_{:02}.txt'.format(dataset, snapshot_count)
     paths['temporal_snapshots'] = './data/timestamps/{}/temporal_snapshots_{:02}.txt'.format(dataset, snapshot_count)
 elif dataset in ['Weibo']:
@@ -51,7 +52,9 @@ print_dict(paths)
 
 def load_raw_labels(path=paths['raw_label']):
     id_label_dict = {}
-    label_id_dict = {'true': [], 'false': [], 'unverified': [], 'non-rumor': []}
+    label_id_dict = {
+        'true': [], 'false': [], 'unverified': [], 'non-rumor': []
+    }
     for line in open(path):
         label, event_id = line.strip().split(":")
         id_label_dict[event_id] = label
@@ -67,7 +70,9 @@ def load_raw_trees(path):
 
 def load_resource_labels(path=paths['resource_label']):
     id_label_dict = {}
-    label_id_dict = {'true': [], 'false': [], 'unverified': [], 'non-rumor': []}
+    label_id_dict = {
+        'true': [], 'false': [], 'unverified': [], 'non-rumor': []
+    }
     for line in open(path):
         elements = line.strip().split('\t')
         label, event_id = elements[0], elements[2]
@@ -96,8 +101,7 @@ def load_resource_trees(path=paths['resource_tree']):
     return trees_dict
 
 
-def raw_tree_to_timestamps(raw_tree_path=paths['raw_tree'],
-                        timestamps_path=paths['timestamps']):
+def raw_tree_to_timestamps(raw_tree_path=paths['raw_tree']):
     temporal_info = {}
     for file_name in os.listdir(raw_tree_path):
         file_id = file_name[:-4]
@@ -113,94 +117,36 @@ def raw_tree_to_timestamps(raw_tree_path=paths['raw_tree'],
             elif src_post_id != dest_post_id:  # responsive posts
                 temporal_info[file_id].append(max(src_time, dest_time))
         temporal_info[file_id] = sorted(temporal_info[file_id], key=lambda x: float(x.strip()))
-    save_json_file(timestamps_path, temporal_info)
+    save_json_file(paths['timestamps'], temporal_info)
     return temporal_info
 
 
-
-load_raw_labels()
-load_resource_labels()
-load_resource_trees()
-raw_tree_to_timestamps()
-
-
-
-# TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO:
-
-# TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO:
-
-
-
-
-def trim_temporal_info(resource_id_label_dict, temporal_info, resource_trees_dict):
-    """
-    match temporal information with resource dict
-    """
-
-    counter = [0, 0, 0, 0]
+# Match timestamps count with resource dict
+def trim_upsample_temporal_info(temporal_info, resource):
+    resource_id_label_dict = resource['id_label_dict']
+    resource_trees_dict = resource['trees_dict']
     for event_id in resource_id_label_dict:
-        raw_temporal_length = len(temporal_info[event_id])
-        resource_tree_length = len(resource_trees_dict[event_id]) - 1
-        if raw_temporal_length > resource_tree_length:
-            temporal_info[event_id] = temporal_info[event_id][:resource_tree_length]
-            counter[0] += 1
-        elif raw_temporal_length < resource_tree_length:
-            counter[1] += 1
-            diff_count = resource_tree_length - raw_temporal_length
-            try:
+        raw_timestamps_count = len(temporal_info[event_id])
+        resource_trees_len = len(resource_trees_dict[event_id]) - 1
+        if raw_timestamps_count > resource_trees_len:  # trim
+            temporal_info[event_id] = temporal_info[event_id][:resource_trees_len]
+        elif raw_timestamps_count < resource_trees_len:  # upsample
+            diff_count = resource_trees_len - raw_timestamps_count
+            if not len(temporal_info[event_id]):
+                upsample = ['1.0'] * diff_count
+            elif len(temporal_info[event_id]) >= diff_count:
                 upsample = random.sample(temporal_info[event_id], diff_count)
-            except:  # Unexpected
-                counter[3] += 1
-                if not len(temporal_info[event_id]):
-                    upsample = ['10.0'] * diff_count
-                else:
-                    upsample = []
-                    for _ in range(diff_count):
-                        upsample.append(random.choice(temporal_info[event_id]))
+            else:
+                upsample = []
+                for _ in range(diff_count):
+                    upsample.append(random.choice(temporal_info[event_id]))
             temporal_info[event_id] += upsample
-            temporal_info[event_id] = sorted(
-                temporal_info[event_id], key=lambda x: float(x.strip()))
-        else:
-            counter[2] += 1
-
-    save_json_file(TIMESTAMPS_PATH, temporal_info)
-    print(counter)
-
+            temporal_info[event_id] = sorted(temporal_info[event_id], key=lambda x: float(x.strip()))
+    save_json_file(paths['timestamps_trim'], temporal_info)
     return temporal_info
-
-
-
-
-
-exit()
-
-
 
 
 # Load Temporal Information - Generate Sequential, Temporal Edge Index
-
-
-
-
-# def load_temporal_info():
-#     with open(TIMESTAMPS_PATH, "r") as sequence_file:
-#         temporal_info = json.loads(sequence_file.read())
-#     return temporal_info
-
-
-"""
-def load_tree_length(TREE_PATH):
-    tree_length_dict = {}
-    for line in open(TREE_PATH):
-        event_id = line.strip().split('\t')[0]
-        if event_id not in tree_length_dict:
-            tree_length_dict[event_id] = 0
-        tree_length_dict[event_id] += 1
-    return tree_length_dict
-"""
-
-
-
 
 def sequence_to_snapshot_index(temporal_info):
     snapshot_edge_index = {}
@@ -208,14 +154,13 @@ def sequence_to_snapshot_index(temporal_info):
         if event_id not in snapshot_edge_index:
             snapshot_edge_index[event_id] = []
         sequence_len = len(temporal_info[event_id])
-        base_edge_count = sequence_len % snapshot_num
-        additional_edge_count = sequence_len // snapshot_num
-        for snapshot_index in range(1, snapshot_num + 1):
+        base_edge_count = sequence_len % snapshot_count
+        additional_edge_count = sequence_len // snapshot_count
+        for snapshot_index in range(1, snapshot_count + 1):
             count = base_edge_count + additional_edge_count * snapshot_index
             snapshot_edge_index[event_id]
             snapshot_edge_index[event_id].append(count)
-
-    save_json_file(SEQUENCE_SNAPSHOT_PATH, snapshot_edge_index)
+    save_json_file(paths['sequential_snapshots'], snapshot_edge_index)
 
 
 def temporal_to_snapshot_index(temporal_info):
@@ -224,13 +169,13 @@ def temporal_to_snapshot_index(temporal_info):
         if event_id not in snapshot_edge_index:
             snapshot_edge_index[event_id] = []
         if not temporal_info[event_id]:
-            snapshot_edge_index[event_id] = [0] * snapshot_num
+            snapshot_edge_index[event_id] = [0] * snapshot_count
             continue
 
         sequence = sorted(temporal_info[event_id], key=lambda x: float(x.strip()))
         sequence = list(map(float, sequence))
-        time_interval = (sequence[-1] - sequence[0]) / snapshot_num
-        for snapshot_index in range(1, snapshot_num + 1):
+        time_interval = (sequence[-1] - sequence[0]) / snapshot_count
+        for snapshot_index in range(1, snapshot_count + 1):
             print('\nsnapshot_index', snapshot_index)
             edge_count = 0
             for seq in sequence:
@@ -244,30 +189,31 @@ def temporal_to_snapshot_index(temporal_info):
         snapshot_edge_index[event_id].pop()
         snapshot_edge_index[event_id].append(len(temporal_info[event_id]))  #
 
-    save_json_file(TEMPORAL_SNAPSHOT_PATH, snapshot_edge_index)
-
-
-# SEQUENCE DICT TO
-
-# print(len(resource_trees_dict))
-# print(resource_trees_dict[list(resource_trees_dict.keys())[0]])
-# print(len(resource_trees_dict[list(resource_trees_dict.keys())[0]]))
-# print(resource_trees_dict['553588178687655936'])
-# print(len(resource_trees_dict['553588178687655936']))
+    save_json_file(paths['temporal_snapshots'], snapshot_edge_index)
 
 
 def main():
+
     print("--------------------------------------")
     print("    RAW DATASET / RESOURCE DATASET    ")
     print("--------------------------------------")
 
-    raw_id_label_dict, raw_label_id_dict = load_raw_labels()
-    resource_id_label_dict, resource_label_id_dict = load_resource_labels()
-    resource_trees_dict = load_resource_trees()
+    raw = {
+        'id_label_dict': None, 'label_id_dict': None,
+        'trees_dict': None,
+    }
+    resource = {
+        'id_label_dict': None, 'label_id_dict': None,
+        'trees_dict': None,
+    }
+
+    raw['id_label_dict'], raw['label_id_dict'] = load_raw_labels()
+    resource['id_label_dict'], resource['label_id_dict'] = load_resource_labels()
+    resource['trees_dict'] = load_resource_trees()
+
     temporal_info = raw_tree_to_timestamps()
-    temporal_info = load_json_file(TIMESTAMPS_PATH)
-    temporal_info = trim_temporal_info(
-        resource_id_label_dict, temporal_info, resource_trees_dict)
+    # temporal_info = load_json_file(TIMESTAMPS_PATH)
+    temporal_info = trim_upsample_temporal_info(temporal_info, resource)
     sequence_to_snapshot_index(temporal_info)
     temporal_to_snapshot_index(temporal_info)
 
@@ -276,22 +222,11 @@ if __name__ == '__main__':
     start_time = time.time()  # Timer Start
     main()
     end_time = time.time()
-    print("\nElapsed Time: {0} seconds".format(round(end_time - start_time, 3)))
-
-
-
-
-
-
-
-
-
-
-
+    print("\nElapsed Time: {0} seconds".format(
+        round(end_time - start_time, 3)))
 
 
 # #######################################################################
-
 
 
 if args['dataset_name'] == 'Twitter15':
@@ -330,4 +265,3 @@ TIMESTAMPS_PATH = './data/sequence/Twitter16/timestamps.txt'
 SEQUENCE_SNAPSHOT_PATH = './data/sequence/Twitter16/sequence_snapshot_{:02}.txt'.format(snapshot_num)
 TEMPORAL_SNAPSHOT_PATH = './data/sequence/Twitter16/temporal_snapshot_{:02}.txt'.format(snapshot_num)
 """
-
