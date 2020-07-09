@@ -11,11 +11,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
-from preparation.dataset_preparation import load_trees
-from preparation.dataset_preparation import load_labels
+from preparation.prepare_snapshots import load_trees
+from preparation.prepare_snapshots import load_labels
 
-from tools.random_folds import load_5_fold_data_train_val_test_sets
-from tools.random_folds import count_fold_labels_train_val_test
+from tools.random_folds import load_k_fold_train_val_test
+from tools.random_folds import count_folds_labels
 
 from tools.early_stopping import EarlyStopping
 from tools.evaluation import evaluation
@@ -24,7 +24,11 @@ from dataset import GraphSnapshotDataset
 
 
 # from project_settings import *
+from utils import print_dict
+from utils import save_json_file
+from utils import load_json_file
 from utils import ensure_directory
+
 
 def write_results(string):  # TODO:
     with open(RESULTS_FILE, 'a') as out_file:

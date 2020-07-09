@@ -20,6 +20,24 @@ import numpy as np
 
 # TODO: merge with `load_labels`
 
+def load_labels(path):  # load_resource_labels
+    id_label_dict = {}
+    label_id_dict = {
+        'true': [], 'false': [], 'unverified': [], 'non-rumor': []
+    }
+    num_labels = {'true': 0, 'false': 1, 'unverified': 2, 'non-rumor': 3}
+    for line in open(path):
+        elements = line.strip().split('\t')
+        label, event_id = elements[0], elements[2]
+        id_label_dict[event_id] = label
+        label_id_dict[label].append(event_id)
+    for key in id_label_dict.keys():
+        id_label_dict[key] = num_labels[id_label_dict[key]]
+    print("PATH: {0}, LEN: {1}".format(path, len(id_label_dict)))
+    print([(key, len(label_id_dict[key])) for key in label_id_dict])
+    return id_label_dict, label_id_dict
+
+"""
 def load_label_id_dict(LABEL_PATH):
     label_id_dict = {
         'true': [], 'false': [], 'unverified': [], 'non-rumor': []
@@ -44,24 +62,6 @@ def load_id_label_dict(LABEL_PATH):
     for num_label in num_labels.values():
         print(num_label, sum(value == num_label for value in id_label_dict.values()))
     return id_label_dict
-
-"""
-def load_labels(path):  # load_resource_labels
-    id_label_dict = {}
-    label_id_dict = {
-        'true': [], 'false': [], 'unverified': [], 'non-rumor': []
-    }
-    num_labels = {'true': 0, 'false': 1, 'unverified': 2, 'non-rumor': 3}
-    for line in open(path):
-        elements = line.strip().split('\t')
-        label, event_id = elements[0], elements[2]
-        id_label_dict[event_id] = label
-        label_id_dict[label].append(event_id)
-    for key in id_label_dict.keys():
-        id_label_dict[key] = num_labels[id_label_dict[key]]
-    print("PATH: {0}, LEN: {1}".format(path, len(id_label_dict)))
-    print([(key, len(label_id_dict[key])) for key in label_id_dict])
-    return id_label_dict, label_id_dict
 """
 
 
@@ -162,8 +162,7 @@ def main():
 
     for dataset in ["Twitter16", "Twitter15"]:
         LABEL_PATH = './resources/{0}/{0}_label_all.txt'.format(dataset)
-        label_id_dict = load_label_id_dict(LABEL_PATH)
-        id_label_dict = load_id_label_dict(LABEL_PATH)
+        id_label_dict, label_id_dict = load_labels(LABEL_PATH)
         folds = load_k_fold_train_val_test(label_id_dict, k=5)
         count_folds_labels(id_label_dict, folds)
         # print_folds_label_counts(id_label_dict, folds, k=5)
