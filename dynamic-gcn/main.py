@@ -12,19 +12,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
-from preparation.prepare_snapshots import load_trees
-from preparation.prepare_snapshots import load_labels
+from preparation.preprocess_dataset import load_resource_labels
+from preparation.preprocess_dataset import load_resource_trees
 
 from tools.random_folds import load_k_fold_train_val_test
-from tools.random_folds import count_folds_labels
+from tools.random_folds import print_folds_labels
 
 from tools.early_stopping import EarlyStopping
 from tools.evaluation import evaluation
 from tools.evaluation import merge_batch_eval_list
 from dataset import GraphSnapshotDataset
 
-
-# from project_settings import *
 from utils import print_dict
 from utils import save_json_file
 from utils import append_json_file
@@ -32,40 +30,73 @@ from utils import load_json_file
 from utils import ensure_directory
 
 
-
-
-
-
-
-
-
-# parser.add_argument('--model', '-m', type=int, help='')
-# sequence_learning_type
-# iterations
-# num_epochs
-# batch_size
-# lr
-# weight_decay
-# patience
-
-
-
-
-
-
-def write_results(string):  # TODO:
+def append_results(string):  # TODO:
     with open(RESULTS_FILE, 'a') as out_file:
         out_file.write(str(string) + '\n')
 
 
-"""
-model = 'GCN'  # TODO:
-dataset_name = args['dataset_name']
-dataset_type = args['dataset_type']
-snapshot_num = args['snapshot_num']
-learning_sequence = args['learning_sequence']
-# TODO: CUDA
-"""
+# -------------------------------
+#         PARSE ARGUMENTS
+# -------------------------------
+parser = argparse.ArgumentParser(description='argparse')
+parser.add_argument('--model', '-m', type=str, default='GCN', help='GCN, GraphSAGE, GIN')
+parser.add_argument('--learning-sequence', '-ls', type=str, help='additive, dot_product')
+parser.add_argument('--dataset-name', '-dn', type=str, help='Twitter15, Twitter16')
+parser.add_argument('--dataset-type', '-dt', type=str, help='sequential, temporal')
+parser.add_argument('--snapshot-num', '-sn', type=int, help='2, 3, 5, ...')
+parser.add_argument('--cuda', '-c', type=str, default='cuda:3', help='cuda:3')
+args = parser.parse_args()
+print(args)
+
+model = args.model
+learning_sequence = args.learning_sequence
+dataset_name = args.dataset_name
+dataset_type = args.dataset_type
+snapshot_num = args.snapshot_num
+current = datetime.datetime.now().strftime("%Y_%m%d_%H%M")
+
+path_info = [model, dataset_name, dataset_type, learning_sequence, snapshot_num, current]
+ensure_directory("./results/")
+RESULTS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_results.txt".format(*path_info)
+FOLDS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_folds.json".format(*path_info)
+MODEL_PATH = "./results/{0}_{1}_{2}_{3}_{4}_{5}_model.pt".format(*path_info)
+TREE_PATH = './resources/{0}/{0}_label_all.txt'.format(dataset_name)
+LABEL_PATH = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset_name)
+
+
+# -----------------------
+#     Hyperparameters
+# -----------------------
+iterations = 10
+num_epochs = 200
+batch_size = 20
+lr = 0.0005
+weight_decay = 1e-4
+patience = 10
+td_droprate = 0.2
+bu_droprate = 0.2
+settings = {
+    "model": model, "dataset_name": dataset_name, "dataset_type": dataset_type,
+    "sequence_learning_type": learning_sequence, "snapshot_num": snapshot_num,
+    "iterations": iterations, "num_epochs": num_epochs, "batch_size": batch_size,
+    "lr": lr, "weight_decay": weight_decay, "patience": patience,
+    "td_droprate": td_droprate, "bu_droprate": bu_droprate,
+    "current": current, "sys.argv": sys.argv, "cuda": args.cuda,
+}
+append_results(settings)  # Dev
+
+counters = {'iter': 0, 'CV': 0}
+device = torch.device(args.cuda if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
+
+
+
+
+
+
+
+
+
 
 # -----------------
 #     OPTION 1)
@@ -105,26 +136,11 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
     #     MODEL
     # -------------
     model = Network(5000, 64, 64, snapshot_num, device).to(device)
-    # model = Network(5000, 128, 128, snapshot_num, device).to(device)
+
 
     # -----------------
     #     OPTIMIZER
     # -----------------
-
-    """
-    BU_params = []
-    for gcn_index in range(snapshot_num):
-        gcn = eval("model.rumor_GCN_{0}".format(gcn_index))
-        BU_params += list(map(id, gcn.BURumorGCN.conv1.parameters()))
-        BU_params += list(map(id, gcn.BURumorGCN.conv2.parameters()))
-    base_params = filter(lambda p: id(p) not in BU_params, model.parameters())
-    optimizer = torch.optim.Adam([
-        {'params': base_params},
-        {'params': model.rumor_GCN_0.BURumorGCN.conv1.parameters(), 'lr': lr/5},
-        {'params': model.rumor_GCN_0.BURumorGCN.conv2.parameters(), 'lr': lr/5}
-    ], lr=lr, weight_decay=weight_decay)
-    """
-
     BU_params = []
     BU_params += list(map(id, model.rumor_GCN_0.BURumorGCN.conv1.parameters()))
     BU_params += list(map(id, model.rumor_GCN_0.BURumorGCN.conv2.parameters()))
@@ -135,13 +151,9 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
         {'params': model.rumor_GCN_0.BURumorGCN.conv2.parameters(), 'lr': lr/5}
     ], lr=lr, weight_decay=weight_decay)
 
-    # optimizer = torch.optim.Adam(
-    #     [{'params': model.parameters()}],
-    #     lr=lr, weight_decay=weight_decay
-    # )
-
     early_stopping = EarlyStopping(patience=patience, verbose=True, model_path=MODEL_PATH)
-    # criterion = nn.CrossEntropyLoss()
+
+
 
     val_dataset = load_snapshot_dataset_val_or_test(dataset_name, tree_dict, x_val)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=5)
@@ -175,7 +187,12 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
             snapshots = []
             for i in range(snapshot_num):
                 snapshots.append(batch_data[i].to(device))
+
+            print("HERE1")
             out_labels = model(snapshots)
+            print("HERE4")
+
+
             loss = F.nll_loss(out_labels, batch_data[0].y)
             del snapshots
             # nn.CrossEntropyLoss = nn.LogSoftmax + nn.NLLLoss
@@ -241,8 +258,8 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
         print("Iter {:03d} | CV {:02d} | Epoch {:05d} | Val_Loss {:.4f} | Val_Accuracy {:.4f}".format(
             counters['iter'], counters['CV'], epoch, np.mean(batch_val_losses), np.mean(batch_val_accuracies))
         )
-        # write_results("eval result: " + str(eval_result))
-        write_results(
+        # append_results("eval result: " + str(eval_result))
+        append_results(
             "Iter {:03d} | CV {:02d} | Epoch {:05d} | Val_Loss {:.4f} | Val_Accuracy {:.4f}".format(
                 counters['iter'], counters['CV'], epoch, np.mean(batch_val_losses), np.mean(batch_val_accuracies)
             )
@@ -307,10 +324,10 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
     losses = [train_losses, validation_losses, test_losses]
     accuracies = [train_accuracies, validation_accuracies, test_accuracies]
 
-    write_results("losses: " + str(losses))
-    write_results("accuracies: " + str(accuracies))
-    write_results("val eval result: " + str(validation_eval_result))
-    write_results("test eval result: " + str(test_eval_result))
+    append_results("losses: " + str(losses))
+    append_results("accuracies: " + str(accuracies))
+    append_results("val eval result: " + str(validation_eval_result))
+    append_results("test eval result: " + str(test_eval_result))
     print("Test_Loss {:.4f} | Test_Accuracy {:.4f}".format(
         np.mean(test_losses), np.mean(test_accuracies))
     )
@@ -320,123 +337,23 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
 
 def main():
 
-    # -------------------------------
-    #         PARSE ARGUMENTS
-    # -------------------------------
-    parser = argparse.ArgumentParser(description='argparse')
-    parser.add_argument('--model', '-m', type=str, default='GCN', help='GCN, GraphSAGE, GIN')
-    parser.add_argument('--learning-sequence', '-ls', type=str, help='additive, dot_product')
-    parser.add_argument('--dataset-name', '-dn', type=str, help='Twitter15, Twitter16')
-    parser.add_argument('--dataset-type', '-dt', type=str, help='sequential, temporal')
-    parser.add_argument('--snapshot-num', '-sn', type=int, help='2, 3, 5, ...')
-    args = parser.parse_args()
-    print(args)
-
-    # model = "GCN"  # GCN, GraphSAGE, GIN
-    # dataset_name = "Twitter15"  # Twitter15, Twitter16
-    # dataset_type = "sequential"  # sequential, temporal
-    # learning_sequence = "dot_product"  # additive, dot_product
-    # snapshot_num = 3
-    # current = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    model = args.model
-    learning_sequence = args.learning_sequence
-    dataset_name = args.dataset_name
-    dataset_type = args.dataset_type
-    snapshot_num = args.snapshot_num
-    current = datetime.datetime.now().strftime("%Y_%m%d_%H%M")
-
-    ensure_directory("./results/")
-    RESULTS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_results.txt".format(
-        model, dataset_name, dataset_type, learning_sequence, snapshot_num, current
-    )
-    FOLDS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_folds.json".format(
-        model, dataset_name, dataset_type, learning_sequence, snapshot_num, current
-    )
-    MODEL_PATH = "./results/{0}_{1}_{2}_{3}_{4}_{5}_model.pt".format(
-        model, dataset_name, dataset_type, learning_sequence, snapshot_num, current
-    )
-
-    # =======================
-    #     Hyperparameters
-    # =======================
-
-    iterations = 10
-    num_epochs = 200
-    batch_size = 20
-    lr = 0.0005
-    weight_decay = 1e-4
-    patience = 10
-    td_droprate = 0.2
-    bu_droprate = 0.2
-    info = {
-        'iterations': iterations,
-        'num_epochs': num_epochs, 'batch_size': batch_size,
-        'lr': lr, 'weight_decay': weight_decay, 'patience': patience,
-        'td_droprate': td_droprate, 'bu_droprate': bu_droprate,
-        "model": model, "dataset_name": dataset_name, "dataset_type": dataset_type,
-        "sequence_learning_type": sequence_learning_type, "snapshot_num": snapshot_num,
-        "td_droprate": td_droprate, "bu_droprate":bu_droprate,
-        "current": current,
-        "sys.argv": sys.argv,
-    }
-    write_results(info)  # Dev
-
-    counters = {'iter': 0, 'CV': 0}
-    device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
-
-
-
-
-
-
-
-
-
-    # arg_names = ['command', 'dataset_name', 'dataset_type', 'snapshot_num']
-    # if len(sys.argv) != 4:
-    #     print("Please check the arguments.\n")
-    #     exit()
-    # args = dict(zip(arg_names, sys.argv))
-    # dataset = args['dataset_name']
-    # dataset_type = args['dataset_type']
-    # snapshot_num = int(args['snapshot_num'])
-    # print_dict(args)
-
-
-
-
-
-
-
-    # dataset_name = sys.argv[1]  # "Twitter15"、"Twitter16"
-    # iterations = int(sys.argv[2])
-
-    TREE_PATH = './resources/BiGCN/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset_name)
-    LABEL_PATH = './resources/BiGCN/{0}/{0}_label_All.txt'.format(dataset_name)
-    tree_dict = load_trees(TREE_PATH)
-    id_label_dict, _ = load_labels(LABEL_PATH)
+    id_label_dict, label_id_dict = load_resource_labels(TREE_PATH)
+    tree_dict = load_resource_trees(LABEL_PATH)
 
     test_accs = []
     TR_F1, FR_F1, UN_F1, NR_F1 = [], [], [], []  # F1 score
 
     for iter_counter in range(iterations):
         counters['iter'] = iter_counter
-        folds = load_5_fold_data_train_val_test_sets(dataset_name)
-
-        append_json_file(FOLDS_FILE, folds)  # Dev
+        folds = load_k_fold_train_val_test(label_id_dict, k=5)
+        print_folds_labels(id_label_dict, folds)
+        append_json_file(FOLDS_FILE, folds)
 
         fold0_x_train, fold0_x_val, fold0_x_test = folds[0][0], folds[1][0], folds[2][0]
         fold1_x_train, fold1_x_val, fold1_x_test = folds[0][1], folds[1][1], folds[2][1]
         fold2_x_train, fold2_x_val, fold2_x_test = folds[0][2], folds[1][2], folds[2][2]
         fold3_x_train, fold3_x_val, fold3_x_test = folds[0][3], folds[1][3], folds[2][3]
         fold4_x_train, fold4_x_val, fold4_x_test = folds[0][4], folds[1][4], folds[2][4]
-
-        for fold_index in range(5):
-            counts = count_fold_labels_train_val_test(
-                id_label_dict, folds[0][fold_index], folds[1][fold_index], folds[2][fold_index]
-            )
-            print(fold_index, counts)
 
         _, _, accs_f0, F1_f0 = train_GCN(tree_dict, fold0_x_train, fold0_x_val, fold0_x_test, counters)  # fold 0
         _, _, accs_f1, F1_f1 = train_GCN(tree_dict, fold1_x_train, fold1_x_val, fold1_x_test, counters)  # fold 1
@@ -447,7 +364,7 @@ def main():
         print("Test Accuracies (k-folds):", accs_f0, accs_f1, accs_f2, accs_f3, accs_f4)
         test_accs.append((accs_f0 + accs_f1 + accs_f2 + accs_f3 + accs_f4) / 5)
 
-        write_results("Test Accuracies Iter: {}/{}, k-folds: {} {} {} {} {} -> {}".format(
+        append_results("Test Accuracies Iter: {}/{}, k-folds: {} {} {} {} {} -> {}".format(
             iter_counter, iterations, accs_f0, accs_f1, accs_f2, accs_f3, accs_f4,
             np.mean([accs_f0, accs_f1, accs_f2, accs_f3, accs_f4]))
         )
@@ -467,10 +384,10 @@ def main():
 
     sums = [sum(test_accs), sum(TR_F1), sum(FR_F1), sum(UN_F1), sum(NR_F1)]
     sums = [s / iterations for s in sums]
-    print("\n")
-    print("INFO:", str(info))
+
+    print("\nINFO:", str(settings))
     print("Total Test Accuray: {:.4f} | TR_F1: {:.4f}, FR_F1: {:.4f}, UN_F1: {:.4f}, NR_F1: {:.4f}".format(*sums))
-    write_results("Total Test Accuray: {:.4f} | TR_F1: {:.4f}, FR_F1: {:.4f}, UN_F1: {:.4f}, NR_F1: {:.4f}".format(*sums))
+    append_results("Total Test Accuray: {:.4f} | TR_F1: {:.4f}, FR_F1: {:.4f}, UN_F1: {:.4f}, NR_F1: {:.4f}".format(*sums))
 
 
 

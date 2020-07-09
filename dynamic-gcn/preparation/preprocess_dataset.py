@@ -35,11 +35,14 @@ def load_resource_labels(path):
     label_id_dict = {
         'true': [], 'false': [], 'unverified': [], 'non-rumor': []
     }
+    num_labels = {'true': 0, 'false': 1, 'unverified': 2, 'non-rumor': 3}
     for line in open(path):
         elements = line.strip().split('\t')
         label, event_id = elements[0], elements[2]
         id_label_dict[event_id] = label
         label_id_dict[label].append(event_id)
+    for key in id_label_dict.keys():
+        id_label_dict[key] = num_labels[id_label_dict[key]]
     print("PATH: {0}, LEN: {1}".format(path, len(id_label_dict)))
     print([(key, len(label_id_dict[key])) for key in label_id_dict])
     return id_label_dict, label_id_dict

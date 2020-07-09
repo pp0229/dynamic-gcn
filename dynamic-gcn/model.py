@@ -143,13 +143,6 @@ class Network(nn.Module):
         self.init_weights()  # Xavier Init
 
     def init_weights(self):
-        # for gcn_index in range(Network.snapshot_num):
-        #     gcn = eval("self.rumor_GCN_{0}".format(gcn_index))
-        #     init.xavier_normal_(gcn.TDrumorGCN.conv1.weight)
-        #     init.xavier_normal_(gcn.TDrumorGCN.conv2.weight)
-        #     init.xavier_normal_(gcn.BUrumorGCN.conv1.weight)
-        #     init.xavier_normal_(gcn.BUrumorGCN.conv2.weight)
-
         init.xavier_normal_(self.rumor_GCN_0.TDRumorGCN.conv1.weight)
         init.xavier_normal_(self.rumor_GCN_0.TDRumorGCN.conv2.weight)
         init.xavier_normal_(self.rumor_GCN_0.BURumorGCN.conv1.weight)
@@ -198,7 +191,12 @@ class Network(nn.Module):
         # shared weights
         x = []
         for s in snapshots:
+            print("HERE2", s)
             x.append(self.rumor_GCN_0(s))
+            print("HERE3", s)
+        print(len(x))
+        x_stack = torch.stack(x, 1)
+
         # x0 = self.rumor_GCN_0(s[0])
         # x1 = self.rumor_GCN_0(s[1])
         # x2 = self.rumor_GCN_0(s[2])

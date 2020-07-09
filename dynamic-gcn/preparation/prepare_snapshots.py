@@ -21,9 +21,12 @@ from utils import print_dict
 from utils import save_json_file
 from utils import load_json_file
 from utils import ensure_directory
+from utils import print_dict
 
+from preprocess_dataset import load_resource_labels as load_labels
 
-def load_labels(path):  # load_resource_labels
+"""
+def load_labels(path):
     id_label_dict = {}
     label_id_dict = {
         'true': [], 'false': [], 'unverified': [], 'non-rumor': []
@@ -39,19 +42,26 @@ def load_labels(path):  # load_resource_labels
     print("PATH: {0}, LEN: {1}".format(path, len(id_label_dict)))
     print([(key, len(label_id_dict[key])) for key in label_id_dict])
     return id_label_dict, label_id_dict
+"""
 
+# TODO: Validate
 
-def load_trees(paths, id_label_dict, snapshot_num):
+def load_snapshot_trees(paths, id_label_dict, snapshot_num):
     sequences_dict = load_json_file(paths['snapshot_index'])
+
+    print(paths['resource_tree'])
+
+    paths['resource_tree'] = './resources/Twitter16/data.TD_RvNN.vol_5000_development.txt'
+
+
     trees_dict = {}
+
     edge_index = 0
     current_snapshot = 0
-
     for line in open(paths['resource_tree']):  # loop for root posts
         elements = line.strip().split('\t')
         event_id = elements[0]
-        parent_index, child_index = elements[1], int(elements[2])  # None
-        _ = int(elements[3])  # max_degree
+        parent_index, child_index = elements[1], int(elements[2])
         word_features = elements[5]
         if event_id not in id_label_dict:
             continue
@@ -69,25 +79,31 @@ def load_trees(paths, id_label_dict, snapshot_num):
                 'word_features': word_features,
             }
 
+    # TODO: TODO: TODO: TODO:
+
+    # TODO: TODO: TODO: TODO:
+
+    edge_index = 0
+    current_snapshot = 0
     for line in open(paths['resource_tree']):
         elements = line.strip().split('\t')
-        event_id, parent_index, child_index = elements[0], elements[1], int(
-            elements[2])  # None
-        # max_degree, max_post_len, word_features = int(elements[3]), int(elements[4]), elements[5]
+        event_id, parent_index, child_index = elements[0], elements[1], int(elements[2])  # None
         _, _, word_features = int(elements[3]), int(elements[4]), elements[5]
         if event_id not in id_label_dict:
             continue
-        current_snapshot = 0
         for snapshot_index in range(current_snapshot, snapshot_num):
             trees_dict[event_id][snapshot_index][child_index] = {
                 'parent_index': parent_index,
                 'word_features': word_features,
             }
+        print(edge_index, sequences_dict[event_id], current_snapshot, snapshot_num)
         if edge_index == sequences_dict[event_id][current_snapshot]:
             current_snapshot += 1
+            if current_snapshot >= snapshot_num:
+                current_snapshot = 0
+                edge_index = 0
         edge_index += 1
 
-    print('trees count:', len(trees_dict), '\n')
     return trees_dict
 
 
@@ -247,7 +263,7 @@ def main():
     # ----------------------------------
 
     id_label_dict, _ = load_labels(paths['resource_label'])
-    trees_dict = load_trees(paths, id_label_dict, snapshot_num)
+    trees_dict = load_snapshot_trees(paths, id_label_dict, snapshot_num)
 
     ensure_directory(paths['graph'])
     for event_id in id_label_dict.keys():

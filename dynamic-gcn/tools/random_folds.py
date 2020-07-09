@@ -113,7 +113,7 @@ def count_train_val_test_labels(id_label_dict, fold_x_train, fold_x_val, fold_x_
     return counts
 
 
-def count_folds_labels(id_label_dict, folds):
+def print_folds_labels(id_label_dict, folds):
     fold_x_train, fold_x_val, fold_x_test = folds[0], folds[1], folds[2]
     for fold_index in range(5):
         counts = count_train_val_test_labels(
@@ -164,7 +164,7 @@ def main():
         LABEL_PATH = './resources/{0}/{0}_label_all.txt'.format(dataset)
         id_label_dict, label_id_dict = load_labels(LABEL_PATH)
         folds = load_k_fold_train_val_test(label_id_dict, k=5)
-        count_folds_labels(id_label_dict, folds)
+        print_folds_labels(id_label_dict, folds)
         # print_folds_label_counts(id_label_dict, folds, k=5)
 
 
