@@ -21,6 +21,12 @@ def save_json_file(path, data):
         json_file.write(json.dumps(data))
 
 
+def append_json_file(path, data):
+    ensure_directory(path)
+    with open(path, 'a') as json_file:
+        json_file.write(json.dumps(data))
+
+
 def load_json_file(path):
     with open(path, "r") as json_file:
         data = json.loads(json_file.read())

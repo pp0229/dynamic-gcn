@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import Dataset
 from torch_geometric.data import Data
 
-# Author: Jiho Choi
+# Author: Jiho Choi (jihochoi@snu.ac.kr)
 # References
 # https://github.com/TianBian95/BiGCN/blob/master/Process/dataset.py
 # https://github.com/Qingfeng-Yao/Dynamic-GCN/blob/master/papercodes/2019-GCN-GAN/utils.py
@@ -39,8 +39,7 @@ class GraphSnapshotDataset(Dataset):
                 allow_pickle=True
             )
             edgeindex = data['edge_index']
-            # DropEdge (ICLR 2020)
-            # TODO: DropEdge++: consider hop counts
+            # DropEdge (ICLR 2020), TODO: DropEdge++: consider hop counts
             if self.td_droprate > 0:
                 row = list(edgeindex[0])
                 col = list(edgeindex[1])
@@ -64,7 +63,6 @@ class GraphSnapshotDataset(Dataset):
                 new_bu_edgeindex = [row, col]
             else:
                 new_bu_edgeindex = [burow, bucol]
-
             data = Data(
                 x=torch.tensor(data['x'], dtype=torch.float32),
                 y=torch.LongTensor([int(data['y'])]),

@@ -214,9 +214,9 @@ class TweetTree(object):
 
 
 def main():
-    # ------------------------------
-    #         READ ARGUMENTS
-    # ------------------------------
+    # -------------------------------
+    #         PARSE ARGUMENTS
+    # -------------------------------
     arg_names = ['command', 'dataset_name', 'dataset_type', 'snapshot_num']
     if len(sys.argv) != 4:
         print("Please check the arguments.\n")

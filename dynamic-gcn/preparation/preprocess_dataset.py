@@ -150,9 +150,9 @@ def temporal_to_snapshot_index(temporal_info, snapshot_num):
 
 
 def main():
-    # ------------------------------
-    #         READ ARGUMENTS
-    # ------------------------------
+    # -------------------------------
+    #         PARSE ARGUMENTS
+    # -------------------------------
     arg_names = ['command', 'dataset_name', 'snapshot_num']
     if len(sys.argv) != 3:
         print("Please check the arguments.\n")

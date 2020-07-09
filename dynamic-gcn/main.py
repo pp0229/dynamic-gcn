@@ -4,6 +4,7 @@ import time
 import datetime
 import random
 import json
+import argparse
 
 import numpy as np
 import torch
@@ -26,29 +27,35 @@ from dataset import GraphSnapshotDataset
 # from project_settings import *
 from utils import print_dict
 from utils import save_json_file
+from utils import append_json_file
 from utils import load_json_file
 from utils import ensure_directory
+
+
+
+
+
+
+
+
+
+# parser.add_argument('--model', '-m', type=int, help='')
+# sequence_learning_type
+# iterations
+# num_epochs
+# batch_size
+# lr
+# weight_decay
+# patience
+
+
+
+
 
 
 def write_results(string):  # TODO:
     with open(RESULTS_FILE, 'a') as out_file:
         out_file.write(str(string) + '\n')
-
-def append_json_file(path, data):
-    # ensure_directory(path)
-    with open(path, 'a') as json_file:
-        json_file.write(json.dumps(data))
-
-# TODO:
-arg_names = [
-    'command',
-    'dataset_name', 'dataset_type', 'snapshot_num',
-    'learning_sequence', 'model'
-]
-args = dict(zip(arg_names, sys.argv))
-print("----------------")
-print(args)
-print("----------------")
 
 
 """
@@ -59,133 +66,15 @@ snapshot_num = args['snapshot_num']
 learning_sequence = args['learning_sequence']
 # TODO: CUDA
 """
+
 # -----------------
 #     OPTION 1)
 # -----------------
 # from model import Network  # Dev
 
-from model_mean_sum_concat import Network  # GCN (ICLR 2017)
+# from model_mean_sum_concat import Network  # GCN (ICLR 2017)
+from model import Network  # GCN (ICLR 2017)
 
-
-# from model_additive_attention_gcn import Network  # GCN (ICLR 2017)
-# from model_additive_attention_sage import Network  # GraphSAGE (NIPS 2017)
-# from model_additive_attention_gin import Network  # Graph Isomorphic Network (ICLR 2019)
-
-
-# from model_self_attention_gcn import Network  # <== # TODO: HERE
-# from model_self_attention_sage import Network  #
-# from model_multi_head_attention import Network  #
-# from model_additive_attention_gcn import Network  # GCN (ICLR 2017)
-# from model_lstm import Network
-# from model_gru import Network
-# from model_mean import Network
-# from model_concat_fc import Network
-
-# TODO: OPT
-# from model_self_attention_gcn_opt import Network  #
-
-
-# =======================
-#     Variations
-# =======================
-
-# TODO: argv
-# dataset = sys.argv[1]  # "Twitter15"、"Twitter16"
-# iterations = int(sys.argv[2])
-
-model = "GCN"  # GCN, GraphSAGE, GIN
-# model = "GraphSAGE"  # GCN, GraphSAGE, GIN
-# dataset_name = "Twitter16"  # Twitter15, Twitter16
-dataset_name = "Twitter15"  # Twitter15, Twitter16
-
-dataset_type = "sequence"  # sequence, temporal
-# dataset_type = "temporal"  # sequence, temporal
-
-
-sequence_learning_type = "self_attention"  # additive_attention, self_attention
-# sequence_learning_type = "additive_attention"  # additive_attention, self_attention
-# sequence_learning_type = "multi_head_attention"  # additive_attention, self_attention
-# sequence_learning_type = "LSTM"  # additive_attention, self_attention
-# sequence_learning_type = "GRU"  # additive_attention, self_attention
-# sequence_learning_type = "mean"  # additive_attention, self_attention
-# sequence_learning_type = "concat"
-
-# snapshot_num = 2
-snapshot_num = 3
-# snapshot_num = 5
-# snapshot_num = 8
-
-
-
-current = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-
-ensure_directory("./results")
-RESULTS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_results.txt".format(
-    dataset_name, model, dataset_type, sequence_learning_type, snapshot_num, current
-)
-FOLDS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_folds.json".format(
-    dataset_name, model, dataset_type, sequence_learning_type, snapshot_num, current
-)
-MODEL_PATH = "./results/{0}_{1}_{2}_{3}_{4}_{5}_model.pt".format(
-    dataset_name, model, dataset_type, sequence_learning_type, snapshot_num, current
-)
-
-
-
-# =======================
-#     Hyperparameters
-# =======================
-
-iterations = 2
-iterations = 10
-num_epochs = 200
-batch_size = 150
-batch_size = 20
-# batch_size = 64
-
-lr = 0.0005
-# lr = 0.0003
-
-weight_decay = 1e-4
-patience = 10
-# patience = 20  # TODO:
-
-td_droprate = 0.2
-bu_droprate = 0.2
-info = {
-    'iterations': iterations,
-    'num_epochs': num_epochs, 'batch_size': batch_size,
-    'lr': lr, 'weight_decay': weight_decay, 'patience': patience,
-    'td_droprate': td_droprate, 'bu_droprate': bu_droprate,
-    "model": model, "dataset_name": dataset_name, "dataset_type": dataset_type,
-    "sequence_learning_type": sequence_learning_type, "snapshot_num": snapshot_num,
-    "td_droprate": td_droprate, "bu_droprate":bu_droprate,
-    "current": current,
-    "sys.argv": sys.argv,
-}
-write_results(info)  # Dev
-
-counters = {'iter': 0, 'CV': 0}
-device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
-
-"""
-def load_snapshot_dataset(dataset_name, tree_dict, fold_x_train, fold_x_val, fold_x_test):
-    data_path = "./data/graph/{0}/{1}_snapshot/".format(dataset_name, dataset_type)
-    train_dataset = GraphSnapshotDataset(
-        tree_dict, fold_x_train, data_path=data_path, snapshot_num=snapshot_num,
-        td_droprate=td_droprate, bu_droprate=bu_droprate,
-    )
-    val_dataset = GraphSnapshotDataset(
-        tree_dict, fold_x_val, data_path=data_path, snapshot_num=snapshot_num)
-
-    test_dataset = GraphSnapshotDataset(
-        tree_dict, fold_x_test, data_path=data_path, snapshot_num=snapshot_num
-    )
-    print("train count:", len(train_dataset))
-    print("val count:", len(val_dataset))
-    print("test count:", len(test_dataset))
-    return train_dataset, val_dataset, test_dataset
-"""
 
 def load_snapshot_dataset_train(dataset_name, tree_dict, fold_x_train):
     data_path = "./data/graph/{0}/{1}_snapshot".format(dataset_name, dataset_type)
@@ -204,8 +93,6 @@ def load_snapshot_dataset_val_or_test(dataset_name, tree_dict, fold_x_val_or_tes
     )
     print("val or test count:", len(val_or_test_dataset))
     return val_or_test_dataset
-
-
 
 
 def train_GCN(tree_dict, x_train, x_val, x_test, counters):
@@ -432,6 +319,95 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
 
 
 def main():
+
+    # -------------------------------
+    #         PARSE ARGUMENTS
+    # -------------------------------
+    parser = argparse.ArgumentParser(description='argparse')
+    parser.add_argument('--model', '-m', type=str, default='GCN', help='GCN, GraphSAGE, GIN')
+    parser.add_argument('--learning-sequence', '-ls', type=str, help='additive, dot_product')
+    parser.add_argument('--dataset-name', '-dn', type=str, help='Twitter15, Twitter16')
+    parser.add_argument('--dataset-type', '-dt', type=str, help='sequential, temporal')
+    parser.add_argument('--snapshot-num', '-sn', type=int, help='2, 3, 5, ...')
+    args = parser.parse_args()
+    print(args)
+
+    # model = "GCN"  # GCN, GraphSAGE, GIN
+    # dataset_name = "Twitter15"  # Twitter15, Twitter16
+    # dataset_type = "sequential"  # sequential, temporal
+    # learning_sequence = "dot_product"  # additive, dot_product
+    # snapshot_num = 3
+    # current = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    model = args.model
+    learning_sequence = args.learning_sequence
+    dataset_name = args.dataset_name
+    dataset_type = args.dataset_type
+    snapshot_num = args.snapshot_num
+    current = datetime.datetime.now().strftime("%Y_%m%d_%H%M")
+
+    ensure_directory("./results/")
+    RESULTS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_results.txt".format(
+        model, dataset_name, dataset_type, learning_sequence, snapshot_num, current
+    )
+    FOLDS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_folds.json".format(
+        model, dataset_name, dataset_type, learning_sequence, snapshot_num, current
+    )
+    MODEL_PATH = "./results/{0}_{1}_{2}_{3}_{4}_{5}_model.pt".format(
+        model, dataset_name, dataset_type, learning_sequence, snapshot_num, current
+    )
+
+    # =======================
+    #     Hyperparameters
+    # =======================
+
+    iterations = 10
+    num_epochs = 200
+    batch_size = 20
+    lr = 0.0005
+    weight_decay = 1e-4
+    patience = 10
+    td_droprate = 0.2
+    bu_droprate = 0.2
+    info = {
+        'iterations': iterations,
+        'num_epochs': num_epochs, 'batch_size': batch_size,
+        'lr': lr, 'weight_decay': weight_decay, 'patience': patience,
+        'td_droprate': td_droprate, 'bu_droprate': bu_droprate,
+        "model": model, "dataset_name": dataset_name, "dataset_type": dataset_type,
+        "sequence_learning_type": sequence_learning_type, "snapshot_num": snapshot_num,
+        "td_droprate": td_droprate, "bu_droprate":bu_droprate,
+        "current": current,
+        "sys.argv": sys.argv,
+    }
+    write_results(info)  # Dev
+
+    counters = {'iter': 0, 'CV': 0}
+    device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
+
+
+
+
+
+
+
+
+
+    # arg_names = ['command', 'dataset_name', 'dataset_type', 'snapshot_num']
+    # if len(sys.argv) != 4:
+    #     print("Please check the arguments.\n")
+    #     exit()
+    # args = dict(zip(arg_names, sys.argv))
+    # dataset = args['dataset_name']
+    # dataset_type = args['dataset_type']
+    # snapshot_num = int(args['snapshot_num'])
+    # print_dict(args)
+
+
+
+
+
+
 
     # dataset_name = sys.argv[1]  # "Twitter15"、"Twitter16"
     # iterations = int(sys.argv[2])
