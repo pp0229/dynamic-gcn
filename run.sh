@@ -49,7 +49,7 @@ python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
     --dataset-name Twitter16 --dataset-type sequential --snapshot-num 3
 
 
-
+# Usage
 python ./dynamic-gcn/main.py -m GCN -ls dot_product -dn Twitter16 -dt sequential -sn 3
 
 

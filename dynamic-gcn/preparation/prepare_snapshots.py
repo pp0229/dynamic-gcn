@@ -49,14 +49,10 @@ def load_labels(path):
 def load_snapshot_trees(paths, id_label_dict, snapshot_num):
     sequences_dict = load_json_file(paths['snapshot_index'])
 
-    print(paths['resource_tree'])
-
-    paths['resource_tree'] = './resources/Twitter16/data.TD_RvNN.vol_5000_development.txt'
-
+    # paths['resource_tree'] = './resources/Twitter16/data.TD_RvNN.vol_5000_development.txt'
 
     trees_dict = {}
 
-    edge_index = 0
     current_snapshot = 0
     for line in open(paths['resource_tree']):  # loop for root posts
         elements = line.strip().split('\t')
@@ -65,10 +61,9 @@ def load_snapshot_trees(paths, id_label_dict, snapshot_num):
         word_features = elements[5]
         if event_id not in id_label_dict:
             continue
-        if parent_index != 'None':
+        if parent_index != 'None':  # not root
             continue
         if event_id not in trees_dict:
-            edge_index = 0
             current_snapshot = 0
             trees_dict[event_id] = {}
             for snapshot_index in range(snapshot_num):
@@ -78,12 +73,15 @@ def load_snapshot_trees(paths, id_label_dict, snapshot_num):
                 'parent_index': parent_index,
                 'word_features': word_features,
             }
+    # print(trees_dict.keys())
+    print(len(trees_dict.keys()))
+    print(list(trees_dict.keys())[:10])
 
     # TODO: TODO: TODO: TODO:
-
+    # Fix Error
     # TODO: TODO: TODO: TODO:
 
-    edge_index = 0
+    edge_index = 1
     current_snapshot = 0
     for line in open(paths['resource_tree']):
         elements = line.strip().split('\t')
@@ -91,19 +89,34 @@ def load_snapshot_trees(paths, id_label_dict, snapshot_num):
         _, _, word_features = int(elements[3]), int(elements[4]), elements[5]
         if event_id not in id_label_dict:
             continue
+        if parent_index == 'None':  # root
+            continue
         for snapshot_index in range(current_snapshot, snapshot_num):
             trees_dict[event_id][snapshot_index][child_index] = {
                 'parent_index': parent_index,
                 'word_features': word_features,
             }
-        print(edge_index, sequences_dict[event_id], current_snapshot, snapshot_num)
+
+        print(sequences_dict[event_id], '\t', edge_index, '\t\t', current_snapshot, snapshot_num, event_id)
+
+        if edge_index > sequences_dict[event_id][current_snapshot]:
+            
+            exit()
+
         if edge_index == sequences_dict[event_id][current_snapshot]:
             current_snapshot += 1
             if current_snapshot >= snapshot_num:
                 current_snapshot = 0
                 edge_index = 0
-        edge_index += 1
 
+        # TODO: fix same edge index
+        # if (current_snapshot == 0) or (sequences_dict[event_id][current_snapshot - 1] != sequences_dict[event_id][current_snapshot]):
+        #     edge_index += 1
+        if (sequences_dict[event_id][current_snapshot - 1] != sequences_dict[event_id][current_snapshot]):
+            edge_index += 1
+        # TODO: fix same edge index
+
+    exit()
     return trees_dict
 
 
