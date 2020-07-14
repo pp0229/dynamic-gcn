@@ -46,8 +46,7 @@ def load_labels(path):
 
 # TODO: Validate
 
-def load_snapshot_trees(paths, id_label_dict, snapshot_num):
-    sequences_dict = load_json_file(paths['snapshot_index'])
+def load_snapshot_trees(paths, id_label_dict, sequences_dict, snapshot_num):
 
     # paths['resource_tree'] = './resources/Twitter16/data.TD_RvNN.vol_5000_development.txt'
 
@@ -81,7 +80,8 @@ def load_snapshot_trees(paths, id_label_dict, snapshot_num):
     # Fix Error
     # TODO: TODO: TODO: TODO:
 
-    edge_index = 1
+
+    edge_index = 1  # responsive post count, without root node
     current_snapshot = 0
     for line in open(paths['resource_tree']):
         elements = line.strip().split('\t')
@@ -97,26 +97,35 @@ def load_snapshot_trees(paths, id_label_dict, snapshot_num):
                 'word_features': word_features,
             }
 
-        print(sequences_dict[event_id], '\t', edge_index, '\t\t', current_snapshot, snapshot_num, event_id)
+        print(sequences_dict[event_id], '\t', edge_index, '\t', current_snapshot, snapshot_num, event_id)
+
+        # TODO: fix duplicate edge index
+        # TODO: fix duplicate edge index
+        # TODO: fix duplicate edge index
 
         if edge_index > sequences_dict[event_id][current_snapshot]:
-            
+            print("HERE")
+
             exit()
+        # TODO: fix duplicate edge index
+        # TODO: fix duplicate edge index
+        # TODO: fix duplicate edge index
 
         if edge_index == sequences_dict[event_id][current_snapshot]:
             current_snapshot += 1
             if current_snapshot >= snapshot_num:
-                current_snapshot = 0
                 edge_index = 0
+                current_snapshot = 0
 
-        # TODO: fix same edge index
+        # TODO: fix duplicate edge index
+        # TODO: fix duplicate edge index
+        # TODO: fix duplicate edge index
         # if (current_snapshot == 0) or (sequences_dict[event_id][current_snapshot - 1] != sequences_dict[event_id][current_snapshot]):
         #     edge_index += 1
         if (sequences_dict[event_id][current_snapshot - 1] != sequences_dict[event_id][current_snapshot]):
             edge_index += 1
         # TODO: fix same edge index
 
-    exit()
     return trees_dict
 
 
@@ -138,7 +147,7 @@ class TweetTree(object):
         self.snapshot_index = snapshot_index
         self.snapshot_num = snapshot_num
         self.construct_tree()
-        self.construct_matrices()  # tree ->
+        self.construct_matrices()  # tree -> edge_matrix
         self.construct_word_features()  # x_word_index, x_word_frequency
         self.save_local()
 
@@ -154,6 +163,7 @@ class TweetTree(object):
         return word_index, word_frequency
 
     def construct_tree(self):  # from tree_dict
+
         tree_dict = self.tree
         index2node = {}
         for i in tree_dict:
@@ -176,8 +186,7 @@ class TweetTree(object):
                 parent_node.children.append(child_node)
         root_features = np.zeros([1, 5000])
         if len(root_word_index) > 0:
-            root_features[0, np.array(root_word_index)] = np.array(
-                root_word_frequency)
+            root_features[0, np.array(root_word_index)] = np.array(root_word_frequency)
         self.index2node = index2node
         self.root_index = root_index
         self.root_features = root_features
@@ -212,6 +221,12 @@ class TweetTree(object):
         for col_elem in col:
             new_col.append(index_map[col_elem])
         edge_matrix = [new_row, new_col]  # TODO: shift
+
+        print(self.event_id)
+        print(edge_matrix)
+
+        print(index_map)
+        print(self.root_index)
         self.root_index = index_map[self.root_index]
         self.edge_matrix = edge_matrix
         self.x_word_index_list = x_word_index_list
@@ -249,6 +264,8 @@ def main():
     arg_names = ['command', 'dataset_name', 'dataset_type', 'snapshot_num']
     if len(sys.argv) != 4:
         print("Please check the arguments.\n")
+        print("Example usage:")
+        print("python ./.../prepare_snapshots.py Twitter16 sequential 3")
         exit()
     args = dict(zip(arg_names, sys.argv))
     dataset = args['dataset_name']
@@ -276,14 +293,22 @@ def main():
     # ----------------------------------
 
     id_label_dict, _ = load_labels(paths['resource_label'])
-    trees_dict = load_snapshot_trees(paths, id_label_dict, snapshot_num)
+    sequences_dict = load_json_file(paths['snapshot_index'])
+    trees_dict = load_snapshot_trees(paths, id_label_dict, sequences_dict, snapshot_num)
+
+    print_dict(trees_dict['615689290706595840'])
 
     ensure_directory(paths['graph'])
     for event_id in id_label_dict.keys():
-        if len(trees_dict[event_id][0]) < 2:  # no responsive post
+        if len(trees_dict[event_id][0]) < 1:  # no responsive post
             print("no responsive post", event_id, len(trees_dict[event_id][0]))
             continue
+
+        if event_id != '615689290706595840':  # TODO: remove
+            continue
+
         for snapshot_index in range(snapshot_num):
+            print(event_id)
             TweetTree(
                 paths['graph'],
                 event_id,
