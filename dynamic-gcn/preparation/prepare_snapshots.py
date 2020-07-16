@@ -47,11 +47,7 @@ def load_labels(path):
 # TODO: Validate
 
 def load_snapshot_trees(paths, id_label_dict, sequences_dict, snapshot_num):
-
-    # paths['resource_tree'] = './resources/Twitter16/data.TD_RvNN.vol_5000_development.txt'
-
     trees_dict = {}
-
     current_snapshot = 0
     for line in open(paths['resource_tree']):  # loop for root posts
         elements = line.strip().split('\t')
@@ -72,7 +68,7 @@ def load_snapshot_trees(paths, id_label_dict, sequences_dict, snapshot_num):
                 'parent_index': parent_index,
                 'word_features': word_features,
             }
-    # print(trees_dict.keys())
+
     print(len(trees_dict.keys()))
     print(list(trees_dict.keys())[:10])
 
@@ -80,17 +76,28 @@ def load_snapshot_trees(paths, id_label_dict, sequences_dict, snapshot_num):
     # Fix Error
     # TODO: TODO: TODO: TODO:
 
-
-    edge_index = 1  # responsive post count, without root node
-    current_snapshot = 0
+    # edge_index = 1  # responsive post count, without root node
+    # current_snapshot = 0
+    prev_event_id = None
     for line in open(paths['resource_tree']):
+
+
         elements = line.strip().split('\t')
         event_id, parent_index, child_index = elements[0], elements[1], int(elements[2])  # None
         _, _, word_features = int(elements[3]), int(elements[4]), elements[5]
+
+        if prev_event_id != event_id:
+            edge_index = 1  # responsive post count, without root node
+            current_snapshot = 0
+            prev_event_id = event_id
+
         if event_id not in id_label_dict:
+            edge_index = 1
+            current_snapshot = 0
             continue
-        if parent_index == 'None':  # root
+        if parent_index == 'None':  # root post
             continue
+
         for snapshot_index in range(current_snapshot, snapshot_num):
             trees_dict[event_id][snapshot_index][child_index] = {
                 'parent_index': parent_index,
@@ -99,32 +106,22 @@ def load_snapshot_trees(paths, id_label_dict, sequences_dict, snapshot_num):
 
         print(sequences_dict[event_id], '\t', edge_index, '\t', current_snapshot, snapshot_num, event_id)
 
-        # TODO: fix duplicate edge index
-        # TODO: fix duplicate edge index
-        # TODO: fix duplicate edge index
-
-        if edge_index > sequences_dict[event_id][current_snapshot]:
-            print("HERE")
-
-            exit()
-        # TODO: fix duplicate edge index
-        # TODO: fix duplicate edge index
-        # TODO: fix duplicate edge index
-
         if edge_index == sequences_dict[event_id][current_snapshot]:
             current_snapshot += 1
-            if current_snapshot >= snapshot_num:
-                edge_index = 0
-                current_snapshot = 0
 
-        # TODO: fix duplicate edge index
-        # TODO: fix duplicate edge index
-        # TODO: fix duplicate edge index
-        # if (current_snapshot == 0) or (sequences_dict[event_id][current_snapshot - 1] != sequences_dict[event_id][current_snapshot]):
-        #     edge_index += 1
-        if (sequences_dict[event_id][current_snapshot - 1] != sequences_dict[event_id][current_snapshot]):
-            edge_index += 1
+        prev_event_id = event_id
+
+        if current_snapshot == snapshot_num:  # next event_id
+            edge_index = 1
+            current_snapshot = 0
+            continue
+
         # TODO: fix same edge index
+        if (sequences_dict[event_id][current_snapshot - 1] \
+            != sequences_dict[event_id][current_snapshot]):
+            edge_index += 1
+        
+        
 
     return trees_dict
 
@@ -298,14 +295,20 @@ def main():
 
     print_dict(trees_dict['615689290706595840'])
 
+    print(len(trees_dict['615689290706595840'][0]))
+    print(len(trees_dict['615689290706595840'][1]))
+    print(len(trees_dict['615689290706595840'][2]))
+    print('--------------------------------------')
+
+
     ensure_directory(paths['graph'])
     for event_id in id_label_dict.keys():
-        if len(trees_dict[event_id][0]) < 1:  # no responsive post
+        if len(trees_dict[event_id][0]) < 2:  # no responsive post
             print("no responsive post", event_id, len(trees_dict[event_id][0]))
             continue
 
-        if event_id != '615689290706595840':  # TODO: remove
-            continue
+        # if event_id != '615689290706595840':  # TODO: remove
+        #     continue
 
         for snapshot_index in range(snapshot_num):
             print(event_id)
