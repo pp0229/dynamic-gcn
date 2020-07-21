@@ -159,6 +159,8 @@ def main():
     arg_names = ['command', 'dataset_name', 'snapshot_num']
     if len(sys.argv) != 3:
         print("Please check the arguments.\n")
+        print("Example usage:")
+        print("python ./.../preprocess_dataset.py Twitter16 3")
         exit()
     args = dict(zip(arg_names, sys.argv))
     dataset, snapshot_num = args['dataset_name'], int(args['snapshot_num'])

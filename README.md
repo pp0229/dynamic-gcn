@@ -86,6 +86,17 @@ pip install torch-geometric
 
 ### Usages
 
+
+<!-- https://github.com/CRIPAC-DIG/SR-GNN -->
+```
+usage: main.py [-h] [--dataset DATASET] [--batchSize BATCHSIZE]
+               [--hiddenSize HIDDENSIZE] [--epoch EPOCH] [--lr LR]
+               [--lr_dc LR_DC] [--lr_dc_step LR_DC_STEP] [--l2 L2]
+               [--step STEP] [--patience PATIENCE] [--nonhybrid]
+               [--validation] [--valid_portion VALID_PORTION]
+```
+
+
 ##### Prepare Dataset
 
 ``` bash

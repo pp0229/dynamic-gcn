@@ -50,6 +50,8 @@ echo "---------------------\n"
 unzip -q data/raw/rumdetect2017.zip -d data/raw/
 
 
+unzip ./resources/Weibo/weibotree.txt.zip -d ./resources/Weibo/
+
 
 # TODO: Preprocess
 # remove duplicate lines

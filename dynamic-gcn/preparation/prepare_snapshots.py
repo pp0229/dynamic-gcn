@@ -148,7 +148,6 @@ class TweetTree(object):
         return word_index, word_frequency
 
     def construct_tree(self):  # from tree_dict
-
         tree_dict = self.tree
         index2node = {}
         for i in tree_dict:

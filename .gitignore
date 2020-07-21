@@ -2,6 +2,8 @@ data/
 temp/
 .vscode/
 
+# Data (Resource)
+resources/Weibo/weibotree.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
