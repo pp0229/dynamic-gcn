@@ -166,23 +166,58 @@ def main():
     dataset, snapshot_num = args['dataset_name'], int(args['snapshot_num'])
     print_dict(args)
 
-    # --------------------------
-    #         INIT PATHS
-    # --------------------------
     paths = {}
     if dataset in ['Twitter15', 'Twitter16']:
+        # --------------------------
+        #         INIT PATHS
+        # --------------------------
+        # Input
         paths['raw'] = './data/raw/rumor_detection_acl2017/'
         paths['raw_label'] = os.path.join(paths['raw'], dataset.lower(), 'label.txt')
         paths['raw_tree'] = os.path.join(paths['raw'], dataset.lower(), 'tree/')
         paths['resource_label'] = './resources/{0}/{0}_label_all.txt'.format(dataset)
         paths['resource_tree'] = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset)
+        # Output (timestamp, index)
         paths['timestamps'] = './data/timestamps/{}/timestamps.txt'.format(dataset)
         paths['timestamps_trim'] = './data/timestamps/{}/timestamps_trim.txt'.format(dataset)
         paths['sequential_snapshots'] = './data/timestamps/{}/sequential_snapshots_{:02}.txt'.format(dataset, snapshot_num)
         paths['temporal_snapshots'] = './data/timestamps/{}/temporal_snapshots_{:02}.txt'.format(dataset, snapshot_num)
+        # --------------------------------------
+        #         RAW / RESOURCE DATASET
+        # --------------------------------------
+        raw = {
+            'id_label_dict': None, 'label_id_dict': None, 'trees_dict': None,
+        }
+        resource = {
+            'id_label_dict': None, 'label_id_dict': None, 'trees_dict': None,
+        }
+        raw['id_label_dict'], _ = load_raw_labels(paths['raw_label'])
+        resource['id_label_dict'], _ = load_resource_labels(paths['resource_label'])
+        resource['trees_dict'] = load_resource_trees(paths['resource_tree'])
+        # temporal_info = load_json_file(paths['timestamps'])  # cache
+        temporal_info = raw_tree_to_timestamps(paths['raw_tree'], paths['timestamps'])
+        save_json_file(paths['timestamps'], temporal_info)
+        temporal_info = trim_upsample_temporal_info(temporal_info, resource)
+        save_json_file(paths['timestamps_trim'], temporal_info)
+
+        edge_index = sequence_to_snapshot_index(temporal_info, snapshot_num)
+        save_json_file(paths['sequential_snapshots'], edge_index)
+        edge_index = temporal_to_snapshot_index(temporal_info, snapshot_num)
+        save_json_file(paths['temporal_snapshots'], edge_index)
+
     elif dataset in ['Weibo']:
-        exit()
+        resource = {
+            'id_label_dict': None, 'label_id_dict': None, 'trees_dict': None,
+        }
+        paths['resource_label'] = './resources/{0}/weibo_id_label.txt'.format(dataset)
+        paths['resource_tree'] = './resources/{0}/weibotree.txt'.format(dataset)
+        paths['sequential_snapshots'] = './data/timestamps/{}/sequential_snapshots_{:02}.txt'.format(dataset, snapshot_num)
+
+        resource['id_label_dict'], _ = load_resource_labels(paths['resource_label'])
+
     else:
+        print("Please check the dataset name.\n")
+        print("E.g. Twitter15, Twitter16, Weibo")
         exit()
     print_dict(paths)
 

@@ -63,6 +63,12 @@ MODEL_PATH = "./results/{0}_{1}_{2}_{3}_{4}_{5}_model.pt".format(*path_info)
 TREE_PATH = './resources/{0}/{0}_label_all.txt'.format(dataset_name)
 LABEL_PATH = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset_name)
 
+# Validate Inputs
+assert model in ['GCN']
+assert learning_sequence in ['additive', 'dot_product']
+assert dataset_name in ['Twitter15', 'Twitter16']
+assert dataset_type in ['sequential', 'temporal']
+assert snapshot_num in [2, 3, 5]
 
 # -----------------------
 #     Hyperparameters
@@ -106,7 +112,7 @@ device = torch.device(args.cuda if torch.cuda.is_available() else 'cpu')
 # from model_mean_sum_concat import Network  # GCN (ICLR 2017)
 from model import Network  # GCN (ICLR 2017)
 
-
+# Train: with DropEdge
 def load_snapshot_dataset_train(dataset_name, tree_dict, fold_x_train):
     data_path = "./data/graph/{0}/{1}_snapshot".format(dataset_name, dataset_type)
     train_dataset = GraphSnapshotDataset(
@@ -116,7 +122,7 @@ def load_snapshot_dataset_train(dataset_name, tree_dict, fold_x_train):
     print("train count:", len(train_dataset))
     return train_dataset
 
-
+# Inference: without DropEdge
 def load_snapshot_dataset_val_or_test(dataset_name, tree_dict, fold_x_val_or_test):
     data_path = "./data/graph/{0}/{1}_snapshot".format(dataset_name, dataset_type)
     val_or_test_dataset = GraphSnapshotDataset(
@@ -188,9 +194,7 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
             for i in range(snapshot_num):
                 snapshots.append(batch_data[i].to(device))
 
-            print("HERE1")
             out_labels = model(snapshots)
-            print("HERE4")
 
 
             loss = F.nll_loss(out_labels, batch_data[0].y)
