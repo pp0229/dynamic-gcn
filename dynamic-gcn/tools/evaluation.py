@@ -6,7 +6,7 @@
 
 from operator import add
 
-def evaluation(prediction, y):  # 4-class
+def evaluation(prediction, y):  # 4-class: T, F, U, N
     TP = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
     FP = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
     FN = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
@@ -47,10 +47,10 @@ def evaluation(prediction, y):  # 4-class
 
     results = {
         'acc_all': acc_all,
-        'C0': [accuracy[0], precision[0], recall[0], F1[0]],
-        'C1': [accuracy[1], precision[1], recall[1], F1[1]],
-        'C2': [accuracy[2], precision[2], recall[2], F1[2]],
-        'C3': [accuracy[3], precision[3], recall[3], F1[3]],
+        'C0': {'acc': accuracy[0], 'prec': precision[0], 'rec': recall[0], 'F1': F1[0]},
+        'C1': {'acc': accuracy[1], 'prec': precision[1], 'rec': recall[1], 'F1': F1[1]},
+        'C2': {'acc': accuracy[2], 'prec': precision[2], 'rec': recall[2], 'F1': F1[2]},
+        'C3': {'acc': accuracy[3], 'prec': precision[3], 'rec': recall[3], 'F1': F1[3]},
     }
     return results
 
@@ -60,25 +60,39 @@ def merge_batch_eval_list(batch_eval_results):
     batch_num = len(batch_eval_results)
 
     # Initialize
-    for key in batch_eval_results[0].keys():
-        if key not in eval_results:
-            if not isinstance(batch_eval_results[0][key], list):
-                eval_results[key] = 0.0
-            else:
-                eval_results[key] = [0.0, 0.0, 0.0, 0.0]
+    # for key in batch_eval_results[0].keys():
+    #     if key not in eval_results:
+    #         if not isinstance(batch_eval_results[0][key], dict):
+    #             eval_results[key] = 0.0
+    #         else:
+    #             eval_results[key] = {
+    #                 'acc': 0.0, 'prec': 0.0, 'rec': 0.0, 'F1': 0.0
+    #             }
+    eval_results = {
+        'acc_all': 0.0,
+        'C0': {'acc': 0.0, 'prec': 0.0, 'rec': 0.0, 'F1': 0.0},
+        'C1': {'acc': 0.0, 'prec': 0.0, 'rec': 0.0, 'F1': 0.0},
+        'C2': {'acc': 0.0, 'prec': 0.0, 'rec': 0.0, 'F1': 0.0},
+        'C3': {'acc': 0.0, 'prec': 0.0, 'rec': 0.0, 'F1': 0.0},
+    }
+
     # Combine
     for batch_eval in batch_eval_results:
         for key in batch_eval.keys():
-            if not isinstance(eval_results[key], list):
-                eval_results[key] += batch_eval[key]  # ACC
+            if not isinstance(eval_results[key], dict):
+                eval_results[key] += batch_eval[key]  # acc_all
             else:
-                eval_results[key] = list(map(add, eval_results[key], batch_eval[key]))
+                # eval_results[key] = list(map(add, eval_results[key], batch_eval[key]))
+                for dict_key in ['acc', 'prec', 'rec', 'F1']:
+                    eval_results[key][dict_key] += batch_eval[key][dict_key]
     # Normalize
     for key in eval_results.keys():
         value = eval_results[key]
-        if not isinstance(eval_results[key], list):
-            eval_results[key] = round(value / batch_num, 4) # ACC
+        if not isinstance(eval_results[key], dict):
+            eval_results[key] = round(value / batch_num, 4) # acc_all
         else:
-            eval_results[key] = [round(v / batch_num, 4) for v in value]
+            # eval_results[key] = [round(v / batch_num, 4) for v in value]
+            for dict_key in ['acc', 'prec', 'rec', 'F1']:
+                eval_results[key][dict_key] = round(eval_results[key][dict_key] / batch_num, 4)
 
     return eval_results

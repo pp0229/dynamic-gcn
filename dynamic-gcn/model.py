@@ -98,10 +98,15 @@ class BiGCN(nn.Module):
 
 
 class Network(nn.Module):
-    def __init__(self, in_feats, hid_feats, out_feats, snapshot_num, device):
+    # def __init__(self, in_feats, hid_feats, out_feats, snapshot_num, device):
+    def __init__(self, in_feats, hid_feats, out_feats, settings):
         super(Network, self).__init__()
-        Network.snapshot_num = snapshot_num
-        Network.device = device
+        # Network.snapshot_num = snapshot_num
+        # Network.device = device
+
+        Network.snapshot_num = settings['snapshot_num']
+        Network.device = settings['cuda']
+
         self.rumor_GCN_0 = BiGCN(in_feats, hid_feats, out_feats)
         self.W_s1 = nn.Linear(out_feats * 2 * 4, 1)
         self.fc = nn.Linear((out_feats + hid_feats) * 2 * 2, 4)
@@ -137,7 +142,7 @@ class Network(nn.Module):
 
         x_stack = torch.stack(x, 1)
         x_mean = x_stack.mean(dim=1)
-        x = self.attention_module(x, x_mean)  # query
+        x = self.attention_module(x, x_mean)  # query: context vector
 
         x_stack = torch.stack(x, 1)
         x_mean = x_stack.mean(dim=1)  # mean pooling (nodes -> graph)

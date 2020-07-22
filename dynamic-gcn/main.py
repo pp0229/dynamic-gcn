@@ -63,16 +63,18 @@ MODEL_PATH = "./results/{0}_{1}_{2}_{3}_{4}_{5}_model.pt".format(*path_info)
 TREE_PATH = './resources/{0}/{0}_label_all.txt'.format(dataset_name)
 LABEL_PATH = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset_name)
 
-# Validate Inputs
+# -------------------------------
+#         Validate Inputs
+# -------------------------------
 assert model in ['GCN']
 assert learning_sequence in ['additive', 'dot_product']
 assert dataset_name in ['Twitter15', 'Twitter16']
 assert dataset_type in ['sequential', 'temporal']
 assert snapshot_num in [2, 3, 5]
 
-# -----------------------
-#     Hyperparameters
-# -----------------------
+# -------------------------------
+#         Hyperparameters
+# -------------------------------
 iterations = 10
 num_epochs = 200
 batch_size = 20
@@ -81,6 +83,9 @@ weight_decay = 1e-4
 patience = 10
 td_droprate = 0.2
 bu_droprate = 0.2
+device = torch.device(args.cuda if torch.cuda.is_available() else exit())
+# device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
+
 settings = {
     "model": model, "dataset_name": dataset_name, "dataset_type": dataset_type,
     "sequence_learning_type": learning_sequence, "snapshot_num": snapshot_num,
@@ -91,26 +96,9 @@ settings = {
 }
 append_results(settings)  # Dev
 
-counters = {'iter': 0, 'CV': 0}
-device = torch.device(args.cuda if torch.cuda.is_available() else 'cpu')
-# device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
 
-
-
-
-
-
-
-
-
-
-# -----------------
-#     OPTION 1)
-# -----------------
-# from model import Network  # Dev
-
-# from model_mean_sum_concat import Network  # GCN (ICLR 2017)
 from model import Network  # GCN (ICLR 2017)
+
 
 # Train: with DropEdge
 def load_snapshot_dataset_train(dataset_name, tree_dict, fold_x_train):
@@ -132,6 +120,10 @@ def load_snapshot_dataset_val_or_test(dataset_name, tree_dict, fold_x_val_or_tes
     return val_or_test_dataset
 
 
+
+counters = {'iter': 0, 'CV': 0}
+
+
 def train_GCN(tree_dict, x_train, x_val, x_test, counters):
 
     train_losses, train_accuracies = [], []
@@ -141,7 +133,7 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
     # -------------
     #     MODEL
     # -------------
-    model = Network(5000, 64, 64, snapshot_num, device).to(device)
+    model = Network(5000, 64, 64, settings).to(device)
 
 
     # -----------------
@@ -319,10 +311,10 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
     test_eval_result = merge_batch_eval_list(batch_test_eval_results)
 
     accs = test_eval_result['acc_all']
-    F0 = test_eval_result['C0'][3]
-    F1 = test_eval_result['C1'][3]
-    F2 = test_eval_result['C2'][3]
-    F3 = test_eval_result['C3'][3]
+    F0 = test_eval_result['C0']['F1']  # F1
+    F1 = test_eval_result['C1']['F1']
+    F2 = test_eval_result['C2']['F1']
+    F3 = test_eval_result['C3']['F1']
 
     counters['CV'] += 1
     losses = [train_losses, validation_losses, test_losses]

@@ -1,6 +1,7 @@
 data/
 temp/
 .vscode/
+results/
 
 # Data (Resource)
 resources/Weibo/weibotree.txt
