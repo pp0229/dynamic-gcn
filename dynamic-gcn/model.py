@@ -189,7 +189,7 @@ class Network(nn.Module):
         #     scores = scores.masked_fill(mask == 0, -1e9)
         attention = F.softmax(scores, dim=-1)
 
-        self.append_results(attention.data[0])
+        self.append_results(attention.data)  # batch average
 
         return attention.matmul(value)
 
