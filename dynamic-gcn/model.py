@@ -16,6 +16,9 @@ from torch_geometric.nn import GCNConv
 # from torch_geometric.nn import GINConv
 
 
+from utils import save_json_file  # Attetnion Weights
+
+
 # References
 # RvNN - https://github.com/majingCUHK/Rumor_RvNN
 # BiGCN - https://github.com/TianBian95/BiGCN/
@@ -113,8 +116,6 @@ class Network(nn.Module):
     # def __init__(self, in_feats, hid_feats, out_feats, snapshot_num, device):
     def __init__(self, in_feats, hid_feats, out_feats, settings):
         super(Network, self).__init__()
-        # Network.snapshot_num = snapshot_num
-        # Network.device = device
 
         Network.snapshot_num = settings['snapshot_num']
         Network.device = settings['cuda']
@@ -122,8 +123,7 @@ class Network(nn.Module):
 
         self.rumor_GCN_0 = BiGCN(in_feats, hid_feats, out_feats)
         self.W_s1 = nn.Linear(out_feats * 2 * 4, 1)  # additive attention
-        # self.fc = nn.Linear((out_feats + hid_feats) * 2 * 2, 4)
-        self.fc = nn.Linear((out_feats + hid_feats) * 4 * 2, 4)
+        self.fc = nn.Linear((out_feats + hid_feats) * 2 * 2, 4)
         self.init_weights()
 
     def init_weights(self):  # Xavier Init
@@ -152,6 +152,9 @@ class Network(nn.Module):
         return updated_x
     """
 
+    # TODO: REFACTORING
+
+    # TODO: TODO: TODO: TODO: TODO:
     def additive_attention(self, x_stack):  # TODO:
         x_context = x_stack.mean(dim=1)  # x_mean
 
@@ -173,6 +176,11 @@ class Network(nn.Module):
         updated_x = torch.stack(updated_x, 1)
         return updated_x
 
+    # TODO: remove "TEMPORAL"
+    def append_results(self, string):  # TODO:
+        with open("./attention.txt", 'a') as out_file:
+            out_file.write(str(string) + '\n')
+
 
     def dot_product_attention(self, query, key, value, mask=None):  # self-attention
         dk = query.size()[-1]  # 256
@@ -180,7 +188,12 @@ class Network(nn.Module):
         # if mask is not None:
         #     scores = scores.masked_fill(mask == 0, -1e9)
         attention = F.softmax(scores, dim=-1)
+
+        self.append_results(attention.data[0])
+
         return attention.matmul(value)
+
+    # TODO: REFACTORING
 
     def attention_module(self, x_stack):
         # Batch x Seq x Embedding - E.g.: (20, 3, 256)
@@ -217,13 +230,13 @@ class Network(nn.Module):
         x_mean = x_stack.mean(dim=1)
 
         # TODO: TMUX 09
-        x_max = torch.max(x_stack, dim=1)[0]
-        x_cat = torch.cat((x_mean, x_max), 1)  # CONCAT(mean, max)
+        # x_max = torch.max(x_stack, dim=1)[0]
+        # x_cat = torch.cat((x_mean, x_max), 1)  # CONCAT(mean, max)
         # TODO: TMUX 09
 
 
         # FC LAYER
         # x = self.fc(x_mean)
-        x = self.fc(x_cat)
+        x = self.fc(x_mean)
         x = F.log_softmax(x, dim=1)
         return x

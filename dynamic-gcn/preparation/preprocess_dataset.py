@@ -66,7 +66,40 @@ def load_resource_trees(path):
     return trees_dict
 
 
-def raw_tree_to_timestamps(raw_tree_path, timestamps_path):
+def load_resource_labels_weibo(path):  # Weibo Dataset
+    id_label_dict = {}
+    label_id_dict = {'0': [], '1': []}
+    # num_labels = {'true': 0, 'false': 1}
+    for line in open(path):
+        elements = line.strip().split(' ')
+        label, event_id = elements[1], elements[0]
+        id_label_dict[event_id] = label
+        label_id_dict[label].append(event_id)
+
+    print("PATH: {0}, LEN: {1}".format(path, len(id_label_dict)))
+    print([(key, len(label_id_dict[key])) for key in label_id_dict])
+    return id_label_dict, label_id_dict
+
+
+def load_resource_trees_weibo(path):  # Weibo
+    trees_dict = {}
+    for line in open(path):
+        elements = line.strip().split('\t')
+        event_id = elements[0]
+        parent_index = elements[1]
+        child_index = int(elements[2])
+        word_features = elements[3]
+        if event_id not in trees_dict:
+            trees_dict[event_id] = {}
+        trees_dict[event_id][child_index] = {
+            'parent_index': parent_index,
+            'word_features': word_features,
+        }
+    print('resource trees count:', len(trees_dict), '\n')
+    return trees_dict
+
+
+def raw_tree_to_timestamps(raw_tree_path, timestamps_path):  # temporal
     temporal_info = {}
     for file_name in os.listdir(raw_tree_path):
         file_id = file_name[:-4]
@@ -85,8 +118,10 @@ def raw_tree_to_timestamps(raw_tree_path, timestamps_path):
     return temporal_info
 
 
-# Match timestamps count with resource dict
-def trim_upsample_temporal_info(temporal_info, resource):
+def retrieve_temporal_info(temporal_info, resource):  # trim or upsample
+    # ------------------------------------------
+    # Twitter: Sequential and Temporal Snapshots
+    # ------------------------------------------
     resource_id_label_dict = resource['id_label_dict']
     resource_trees_dict = resource['trees_dict']
     for event_id in resource_id_label_dict:
@@ -107,6 +142,51 @@ def trim_upsample_temporal_info(temporal_info, resource):
             temporal_info[event_id] += upsample
             temporal_info[event_id] = sorted(temporal_info[event_id], key=lambda x: float(x.strip()))
     return temporal_info
+
+
+def retrieve_sequential_info_weibo(resource):
+    # ---------------------------
+    # Weibo: Sequential Snapshots
+    # ---------------------------
+    resource_id_label_dict = resource['id_label_dict']
+    resource_trees_dict = resource['trees_dict']
+
+    sequential_info = {}
+
+    """
+    print()
+    counter = 0
+    counter2 = 0
+    for event_id in resource_trees_dict:
+        try:
+            resource_id_label_dict[event_id]
+            counter += 1
+        except:
+            counter2 += 1
+            pass
+    print(counter, counter2)
+
+
+    print()
+    counter = 0
+    counter2 = 0
+    for event_id in resource_id_label_dict:
+        try:
+            resource_trees_dict[event_id]
+            counter += 1
+        except:
+            counter2 += 1
+            pass
+    print(counter, counter2)
+    """
+
+    for event_id in resource_id_label_dict:
+        if event_id in resource_trees_dict:
+            resource_trees_len = len(resource_trees_dict[event_id]) - 1
+            sequential_info[event_id] = ['1.0'] * resource_trees_len
+        else:
+            continue
+    return sequential_info
 
 
 # Load Temporal Information - Generate Sequential, Temporal Edge Index
@@ -178,10 +258,12 @@ def main():
         paths['resource_label'] = './resources/{0}/{0}_label_all.txt'.format(dataset)
         paths['resource_tree'] = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset)
         # Output (timestamp, index)
+        paths['timestamps_raw'] = './data/timestamps/{}/timestamps_raw.txt'.format(dataset)
         paths['timestamps'] = './data/timestamps/{}/timestamps.txt'.format(dataset)
-        paths['timestamps_trim'] = './data/timestamps/{}/timestamps_trim.txt'.format(dataset)
         paths['sequential_snapshots'] = './data/timestamps/{}/sequential_snapshots_{:02}.txt'.format(dataset, snapshot_num)
         paths['temporal_snapshots'] = './data/timestamps/{}/temporal_snapshots_{:02}.txt'.format(dataset, snapshot_num)
+        print_dict(paths)
+
         # --------------------------------------
         #         RAW / RESOURCE DATASET
         # --------------------------------------
@@ -194,57 +276,67 @@ def main():
         raw['id_label_dict'], _ = load_raw_labels(paths['raw_label'])
         resource['id_label_dict'], _ = load_resource_labels(paths['resource_label'])
         resource['trees_dict'] = load_resource_trees(paths['resource_tree'])
-        # temporal_info = load_json_file(paths['timestamps'])  # cache
-        temporal_info = raw_tree_to_timestamps(paths['raw_tree'], paths['timestamps'])
-        save_json_file(paths['timestamps'], temporal_info)
-        temporal_info = trim_upsample_temporal_info(temporal_info, resource)
-        save_json_file(paths['timestamps_trim'], temporal_info)
 
+        temporal_info = raw_tree_to_timestamps(paths['raw_tree'], paths['timestamps'])
+        save_json_file(paths['timestamps_raw'], temporal_info)
+        # temporal_info = load_json_file(paths['timestamps_raw'])  # cache
+        temporal_info = retrieve_temporal_info(temporal_info, resource)
+        save_json_file(paths['timestamps'], temporal_info)
         edge_index = sequence_to_snapshot_index(temporal_info, snapshot_num)
         save_json_file(paths['sequential_snapshots'], edge_index)
         edge_index = temporal_to_snapshot_index(temporal_info, snapshot_num)
         save_json_file(paths['temporal_snapshots'], edge_index)
 
     elif dataset in ['Weibo']:
+        # --------------------------
+        #         INIT PATHS
+        # --------------------------
+        paths['resource_label'] = './resources/{0}/weibo_id_label.txt'.format(dataset)
+        paths['resource_tree'] = './resources/{0}/weibotree.txt'.format(dataset)
+        paths['timestamps'] = './data/timestamps/{}/timestamps.txt'.format(dataset)
+        paths['sequential_snapshots'] = './data/timestamps/{}/sequential_snapshots_{:02}.txt'.format(dataset, snapshot_num)
+
+        # --------------------------------
+        #         RESOURCE DATASET
+        # --------------------------------
         resource = {
             'id_label_dict': None, 'label_id_dict': None, 'trees_dict': None,
         }
-        paths['resource_label'] = './resources/{0}/weibo_id_label.txt'.format(dataset)
-        paths['resource_tree'] = './resources/{0}/weibotree.txt'.format(dataset)
+        resource['id_label_dict'], _ = load_resource_labels_weibo(paths['resource_label'])
+        resource['trees_dict'] = load_resource_trees_weibo(paths['resource_tree'])
+
+        sequential_info = retrieve_sequential_info_weibo(resource)
+        save_json_file(paths['timestamps'], sequential_info)
+        edge_index = sequence_to_snapshot_index(sequential_info, snapshot_num)
+        save_json_file(paths['sequential_snapshots'], edge_index)
+
+    elif dataset in ['Pheme']:
+        # --------------------------
+        #         INIT PATHS
+        # --------------------------
+        paths['resource_label'] = './resources/{0}/pheme-label_balance.txt'.format(dataset)
+        paths['resource_tree'] = './resources/{0}/pheme.vol_5000.txt'.format(dataset)
+        paths['timestamps'] = './data/timestamps/{}/timestamps.txt'.format(dataset)
         paths['sequential_snapshots'] = './data/timestamps/{}/sequential_snapshots_{:02}.txt'.format(dataset, snapshot_num)
 
-        resource['id_label_dict'], _ = load_resource_labels(paths['resource_label'])
+        # --------------------------------
+        #         RESOURCE DATASET
+        # --------------------------------
+        resource = {
+            'id_label_dict': None, 'label_id_dict': None, 'trees_dict': None,
+        }
+        resource['id_label_dict'], _ = load_resource_labels_weibo(paths['resource_label'])
+        resource['trees_dict'] = load_resource_trees_weibo(paths['resource_tree'])
+
+        sequential_info = retrieve_sequential_info_weibo(resource)
+        save_json_file(paths['timestamps'], sequential_info)
+        edge_index = sequence_to_snapshot_index(sequential_info, snapshot_num)
+        save_json_file(paths['sequential_snapshots'], edge_index)
 
     else:
         print("Please check the dataset name.\n")
         print("E.g. Twitter15, Twitter16, Weibo")
         exit()
-    print_dict(paths)
-
-
-    # --------------------------------------
-    #         RAW / RESOURCE DATASET
-    # --------------------------------------
-    raw = {
-        'id_label_dict': None, 'label_id_dict': None, 'trees_dict': None,
-    }
-    resource = {
-        'id_label_dict': None, 'label_id_dict': None, 'trees_dict': None,
-    }
-    raw['id_label_dict'], _ = load_raw_labels(paths['raw_label'])
-    resource['id_label_dict'], _ = load_resource_labels(paths['resource_label'])
-    resource['trees_dict'] = load_resource_trees(paths['resource_tree'])
-
-    # temporal_info = load_json_file(paths['timestamps'])  # cache
-    temporal_info = raw_tree_to_timestamps(paths['raw_tree'], paths['timestamps'])
-    save_json_file(paths['timestamps'], temporal_info)
-    temporal_info = trim_upsample_temporal_info(temporal_info, resource)
-    save_json_file(paths['timestamps_trim'], temporal_info)
-
-    edge_index = sequence_to_snapshot_index(temporal_info, snapshot_num)
-    save_json_file(paths['sequential_snapshots'], edge_index)
-    edge_index = temporal_to_snapshot_index(temporal_info, snapshot_num)
-    save_json_file(paths['temporal_snapshots'], edge_index)
 
 
 if __name__ == '__main__':

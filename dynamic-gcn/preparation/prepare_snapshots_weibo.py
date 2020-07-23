@@ -23,7 +23,8 @@ from utils import load_json_file
 from utils import ensure_directory
 from utils import print_dict
 
-from preprocess_dataset import load_resource_labels as load_labels
+# from preprocess_dataset import load_resource_labels as load_labels
+from preprocess_dataset import load_resource_labels_weibo as load_labels
 
 """
 def load_labels(path):
@@ -46,14 +47,15 @@ def load_labels(path):
 
 # TODO: Validate
 
-def load_snapshot_trees(paths, id_label_dict, sequences_dict, snapshot_num):
+def load_snapshot_trees_weibo(paths, id_label_dict, sequences_dict, snapshot_num):
     trees_dict = {}
     current_snapshot = 0
     for line in open(paths['resource_tree']):  # loop for root posts
         elements = line.strip().split('\t')
         event_id = elements[0]
         parent_index, child_index = elements[1], int(elements[2])
-        word_features = elements[5]
+        # word_features = elements[5]
+        word_features = elements[3]
         if event_id not in id_label_dict:
             continue
         if parent_index != 'None':  # not root
@@ -69,14 +71,12 @@ def load_snapshot_trees(paths, id_label_dict, sequences_dict, snapshot_num):
                 'word_features': word_features,
             }
 
-    print(len(trees_dict.keys()))
-    print(list(trees_dict.keys())[:10])
-
     prev_event_id = None
     for line in open(paths['resource_tree']):
         elements = line.strip().split('\t')
         event_id, parent_index, child_index = elements[0], elements[1], int(elements[2])  # None
-        _, _, word_features = int(elements[3]), int(elements[4]), elements[5]
+        # _, _, word_features = int(elements[3]), int(elements[4]), elements[5]
+        word_features = elements[3]
 
         if prev_event_id != event_id:
             edge_index = 1  # responsive post count, without root node
@@ -257,13 +257,23 @@ def main():
     # --------------------------
     paths = {}
     if dataset in ['Twitter15', 'Twitter16']:
-        paths['resource_label'] = './resources/{0}/{0}_label_all.txt'.format(dataset)
-        paths['resource_tree'] = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset)
+        pass
+        # paths['resource_label'] = './resources/{0}/{0}_label_all.txt'.format(dataset)
+        # paths['resource_tree'] = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset)
+        # paths['timestamps'] = './data/timestamps/{}/timestamps.txt'.format(dataset)
+        # paths['snapshot_index'] = './data/timestamps/{}/{}_snapshots_{:02}.txt'.format(dataset, dataset_type, snapshot_num)
+        # paths['graph'] = './data/graph/{0}/{1}_snapshot/'.format(dataset, dataset_type)
+    elif dataset in ['Weibo']:
+        # TODO: check if temporal ->
+
+        paths['resource_label'] = './resources/{0}/weibo_id_label.txt'.format(dataset)
+        paths['resource_tree'] = './resources/{0}/weibotree.txt'.format(dataset)
+        paths['resource_tree_cache'] = './resources/{0}/weibotree_cache.txt'.format(dataset)
         paths['timestamps'] = './data/timestamps/{}/timestamps.txt'.format(dataset)
+        paths['sequential_snapshots'] = './data/timestamps/{}/sequential_snapshots_{:02}.txt'.format(dataset, snapshot_num)
         paths['snapshot_index'] = './data/timestamps/{}/{}_snapshots_{:02}.txt'.format(dataset, dataset_type, snapshot_num)
         paths['graph'] = './data/graph/{0}/{1}_snapshot/'.format(dataset, dataset_type)
-    elif dataset in ['Weibo']:
-        exit()
+
     else:
         exit()
 
@@ -273,15 +283,26 @@ def main():
 
     id_label_dict, _ = load_labels(paths['resource_label'])
     sequences_dict = load_json_file(paths['snapshot_index'])
-    trees_dict = load_snapshot_trees(paths, id_label_dict, sequences_dict, snapshot_num)
+    save_json_file(paths['timestamps_raw'], sequences_dict)
+
+    trees_dict = load_snapshot_trees_weibo(paths, id_label_dict, sequences_dict, snapshot_num)
+    save_json_file(paths['timestamps_raw'], trees_dict)
+    # trees_dict = load_json_file(paths['timestamps_raw'])  # cache
 
     ensure_directory(paths['graph'])
+
+    error_list = []
     for index, event_id in enumerate(id_label_dict.keys()):
-        # print("[{:04d}/{:04d}]".format(index, len(id_label_dict.keys()) - 1))
+
+        print(event_id)
+
+        if event_id not in trees_dict:
+            continue
+
         if len(trees_dict[event_id][0]) < 2:  # no responsive post
             print("no responsive post", event_id, len(trees_dict[event_id][0]))
             continue
-
+        """
         for snapshot_index in range(snapshot_num):
             TweetTree(
                 paths['graph'],
@@ -291,6 +312,29 @@ def main():
                 snapshot_index,
                 snapshot_num,
             )
+        """
+        try:
+            if len(trees_dict[event_id][0]) < 2:  # no responsive post
+                print("no responsive post", event_id, len(trees_dict[event_id][0]))
+                continue
+
+            for snapshot_index in range(snapshot_num):
+                TweetTree(
+                    paths['graph'],
+                    event_id,
+                    id_label_dict[event_id],
+                    trees_dict[event_id][snapshot_index],
+                    snapshot_index,
+                    snapshot_num,
+                )
+        except:
+            error_list.append(event_id)
+            # 11 ERRORS
+            # ['3501902090262385', '3907580407356244', '3907742282069764', '3909081075061253', '3909155720971721', '3914408365363135', '3684095995971132', '3466379833885944', '3500947630475466', '3523166905046601', '3547825524904328']
+
+
+    print
+    print(error_list, len(error_list))
 
 
 if __name__ == '__main__':

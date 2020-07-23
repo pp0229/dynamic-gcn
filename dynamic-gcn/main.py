@@ -15,6 +15,9 @@ from torch_geometric.data import DataLoader
 from preparation.preprocess_dataset import load_resource_labels
 from preparation.preprocess_dataset import load_resource_trees
 
+# from preparation.preprocess_dataset import load_resource_labels_weibo as load_resource_labels
+# from preparation.preprocess_dataset import load_resource_trees_weibo as load_resource_trees
+
 from tools.random_folds import load_k_fold_train_val_test
 from tools.random_folds import print_folds_labels
 
@@ -63,7 +66,7 @@ current = datetime.datetime.now().strftime("%Y_%m%d_%H%M")
 # -------------------------------
 assert model in ['GCN']
 assert learning_sequence in ['additive', 'dot_product']
-assert dataset_name in ['Twitter15', 'Twitter16']
+assert dataset_name in ['Twitter15', 'Twitter16', 'Weibo']
 assert dataset_type in ['sequential', 'temporal']
 assert snapshot_num in [2, 3, 5]
 
@@ -79,13 +82,18 @@ MODEL_PATH = "./results/{0}_{1}_{2}_{3}_{4}_{5}_model.pt".format(*path_info)
 TREE_PATH = './resources/{0}/{0}_label_all.txt'.format(dataset_name)
 LABEL_PATH = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset_name)
 
+if dataset_name == 'Weibo':
+    TREE_PATH = './resources/{0}/weibotree.txt'.format(dataset_name)
+    LABEL_PATH = './resources/{0}/weibo_id_label.txt'.format(dataset_name)
+
 
 # -------------------------------
 #         Hyperparameters
 # -------------------------------
 iterations = 10
 num_epochs = 200
-batch_size = 20
+# batch_size = 20
+batch_size = 100
 lr = 0.0005
 weight_decay = 1e-4
 patience = 10
