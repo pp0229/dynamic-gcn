@@ -46,7 +46,7 @@ parser.add_argument('--learning-sequence', '-ls', type=str, help='additive, dot_
 parser.add_argument('--dataset-name', '-dn', type=str, help='Twitter15, Twitter16')
 parser.add_argument('--dataset-type', '-dt', type=str, help='sequential, temporal')
 parser.add_argument('--snapshot-num', '-sn', type=int, help='2, 3, 5, ...')
-parser.add_argument('--cuda', '-c', type=str, default='cuda:3', help='cuda:3')
+parser.add_argument('--cuda', '-c', type=str, default='cuda:2', help='cuda:3')
 args = parser.parse_args()
 print(args)
 

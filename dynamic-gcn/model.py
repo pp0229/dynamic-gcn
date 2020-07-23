@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import torch.nn.init as init
 
 from torch_scatter import scatter_mean
+from torch_scatter import scatter_max
 from torch_geometric.data import DataLoader
 from torch_geometric.nn import GCNConv
 # from torch_geometric.nn import SAGEConv
@@ -50,8 +51,12 @@ class TDRumorGCN(nn.Module):
             index = (torch.eq(data.batch, num_batch))
             root_extend[index] = x2[root_index[num_batch]]
         x = torch.cat((x, root_extend), 1)
-        x = scatter_mean(x, data.batch, dim=0)
-        return x
+
+        # READOUT LAYER: mean, max pooling (nodes -> graph)
+        x_mean = scatter_mean(x, data.batch, dim=0)  # B x 64
+        x_max = scatter_max(x, data.batch, dim=0)[0]  # B x 64
+        x = torch.cat((x_mean, x_max), 1)  # CONCAT(mean, max)
+        return x  # B x 128
 
 
 class BURumorGCN(nn.Module):
@@ -83,8 +88,12 @@ class BURumorGCN(nn.Module):
             index = (torch.eq(data.batch, num_batch))
             root_extend[index] = x2[root_index[num_batch]]
         x = torch.cat((x, root_extend), 1)
-        x = scatter_mean(x, data.batch, dim=0)
-        return x
+
+        # READOUT LAYER: mean, max pooling (nodes -> graph)
+        x_mean = scatter_mean(x, data.batch, dim=0)  # B x 64
+        x_max = scatter_max(x, data.batch, dim=0)[0]  # B x 64
+        x = torch.cat((x_mean, x_max), 1)  # CONCAT(mean, max)
+        return x  # B x 128
 
 
 class BiGCN(nn.Module):
@@ -113,7 +122,8 @@ class Network(nn.Module):
 
         self.rumor_GCN_0 = BiGCN(in_feats, hid_feats, out_feats)
         self.W_s1 = nn.Linear(out_feats * 2 * 4, 1)  # additive attention
-        self.fc = nn.Linear((out_feats + hid_feats) * 2 * 2, 4)
+        # self.fc = nn.Linear((out_feats + hid_feats) * 2 * 2, 4)
+        self.fc = nn.Linear((out_feats + hid_feats) * 4 * 2, 4)
         self.init_weights()
 
     def init_weights(self):  # Xavier Init
@@ -124,6 +134,7 @@ class Network(nn.Module):
         init.xavier_normal_(self.W_s1.weight)
         init.xavier_normal_(self.fc.weight)
 
+    """
     def additive_attention(self, x, x_context):  # additive attention
         attn_w = []
         for current_x in x:
@@ -139,8 +150,31 @@ class Network(nn.Module):
             updated_x.append(weighted_x)
         updated_x = torch.stack(updated_x, 1)
         return updated_x
+    """
 
-    def self_attention(self, query, key, value, mask=None):  # Self-Attention
+    def additive_attention(self, x_stack):  # TODO:
+        x_context = x_stack.mean(dim=1)  # x_mean
+
+        # (20, 3, 256) -> (20, 3, 512)
+        self.W_s1(torch.cat((current_x, x_context), 1))
+
+        attn_w = []
+        for current_x in x:
+            attn_w.append()
+        attn_weights = torch.cat((attn_w), 1)  # B x 5
+        attn_weights = F.softmax(attn_weights, dim=1)
+        updated_x = []
+        for index, current_x in enumerate(x):
+            weighted_x = torch.bmm(
+                current_x.unsqueeze(2),
+                attn_weights[:, index].unsqueeze(1).unsqueeze(2)
+            )
+            updated_x.append(weighted_x)
+        updated_x = torch.stack(updated_x, 1)
+        return updated_x
+
+
+    def dot_product_attention(self, query, key, value, mask=None):  # self-attention
         dk = query.size()[-1]  # 256
         scores = query.matmul(key.transpose(-2, -1)) / math.sqrt(dk)
         # if mask is not None:
@@ -149,31 +183,47 @@ class Network(nn.Module):
         return attention.matmul(value)
 
     def attention_module(self, x_stack):
-        # MEAN
-        # LSTM, GRU
-        # self-attention
+        # Batch x Seq x Embedding - E.g.: (20, 3, 256)
 
-        if Network.learning_sequence == "additive":
-            x_mean = x_stack.mean(dim=1)
-            x_stack = self.additive_attention(x_stack, x_mean)  # query: context
+        if Network.learning_sequence == "mean":
+            pass
+        elif Network.learning_sequence == "additive":
+            x_stack = self.additive_attention(x_stack)
         elif Network.learning_sequence == "dot_product":
-            x_stack = self.self_attention(x_stack, x_stack, x_stack)
+            x_stack = self.dot_product_attention(x_stack, x_stack, x_stack)
+        elif Network.learning_sequence == "LSTM":
+            pass
+        elif Network.learning_sequence == "GRU":
+            pass
         else:
+            # MEAN
+            # LSTM, GRU
             pass
 
         return x_stack
 
     def forward(self, snapshots):
+
+        # 2) GCN LAYERS + 3) READOUT LAYER
         x = []
         for s in snapshots:
             x.append(self.rumor_GCN_0(s))
 
+        # 4) ATTENTION LAYER
         x_stack = torch.stack(x, 1)  # B x S x D - E.g.: (20, 3, 256)
         x_stack = self.attention_module(x_stack)
+        # x_sum = x_stack.sum(dim=1)
+        # x_mean = x_stack.mean(dim=1)
+        x_mean = x_stack.mean(dim=1)
 
-        x_mean = x_stack.mean(dim=1)  # mean pooling (nodes -> graph)
-        x_max = torch.max(x_stack, dim=1)[0]  # max pooling (nodes -> graph)
-        x_cat = torch.cat((x_mean, x_max), 1).squeeze(2)
+        # TODO: TMUX 09
+        x_max = torch.max(x_stack, dim=1)[0]
+        x_cat = torch.cat((x_mean, x_max), 1)  # CONCAT(mean, max)
+        # TODO: TMUX 09
+
+
+        # FC LAYER
+        # x = self.fc(x_mean)
         x = self.fc(x_cat)
         x = F.log_softmax(x, dim=1)
         return x
