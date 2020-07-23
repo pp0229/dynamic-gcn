@@ -122,7 +122,7 @@ def print_folds_labels(id_label_dict, folds):
             fold_x_val[fold_index],
             fold_x_test[fold_index]
         )
-        print(fold_index, counts)
+        print("Fold {}: {}".format(fold_index, counts))
 
 """
 def print_folds_label_counts(id_label_dict, folds, k=5):

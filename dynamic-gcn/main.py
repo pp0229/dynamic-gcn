@@ -29,6 +29,8 @@ from utils import append_json_file
 from utils import load_json_file
 from utils import ensure_directory
 
+from model import Network  # GCN (ICLR 2017) ++
+
 
 def append_results(string):  # TODO:
     with open(RESULTS_FILE, 'a') as out_file:
@@ -55,13 +57,6 @@ dataset_type = args.dataset_type
 snapshot_num = args.snapshot_num
 current = datetime.datetime.now().strftime("%Y_%m%d_%H%M")
 
-path_info = [model, dataset_name, dataset_type, learning_sequence, snapshot_num, current]
-ensure_directory("./results/")
-RESULTS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_results.txt".format(*path_info)
-FOLDS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_folds.json".format(*path_info)
-MODEL_PATH = "./results/{0}_{1}_{2}_{3}_{4}_{5}_model.pt".format(*path_info)
-TREE_PATH = './resources/{0}/{0}_label_all.txt'.format(dataset_name)
-LABEL_PATH = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset_name)
 
 # -------------------------------
 #         Validate Inputs
@@ -71,6 +66,19 @@ assert learning_sequence in ['additive', 'dot_product']
 assert dataset_name in ['Twitter15', 'Twitter16']
 assert dataset_type in ['sequential', 'temporal']
 assert snapshot_num in [2, 3, 5]
+
+
+# --------------------------
+#         INIT PATHS
+# --------------------------
+path_info = [model, dataset_name, dataset_type, learning_sequence, snapshot_num, current]
+ensure_directory("./results/")
+RESULTS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_results.txt".format(*path_info)
+FOLDS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_folds.json".format(*path_info)
+MODEL_PATH = "./results/{0}_{1}_{2}_{3}_{4}_{5}_model.pt".format(*path_info)
+TREE_PATH = './resources/{0}/{0}_label_all.txt'.format(dataset_name)
+LABEL_PATH = './resources/{0}/data.TD_RvNN.vol_5000.txt'.format(dataset_name)
+
 
 # -------------------------------
 #         Hyperparameters
@@ -88,16 +96,14 @@ device = torch.device(args.cuda if torch.cuda.is_available() else exit())
 
 settings = {
     "model": model, "dataset_name": dataset_name, "dataset_type": dataset_type,
-    "sequence_learning_type": learning_sequence, "snapshot_num": snapshot_num,
+    "learning_sequence": learning_sequence, "snapshot_num": snapshot_num,
     "iterations": iterations, "num_epochs": num_epochs, "batch_size": batch_size,
     "lr": lr, "weight_decay": weight_decay, "patience": patience,
     "td_droprate": td_droprate, "bu_droprate": bu_droprate,
     "current": current, "sys.argv": sys.argv, "cuda": args.cuda,
 }
 append_results(settings)  # Dev
-
-
-from model import Network  # GCN (ICLR 2017)
+counters = {'iter': 0, 'CV': 0}
 
 
 # Train: with DropEdge
@@ -121,7 +127,6 @@ def load_snapshot_dataset_val_or_test(dataset_name, tree_dict, fold_x_val_or_tes
 
 
 
-counters = {'iter': 0, 'CV': 0}
 
 
 def train_GCN(tree_dict, x_train, x_val, x_test, counters):

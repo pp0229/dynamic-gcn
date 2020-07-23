@@ -1,6 +1,7 @@
 import sys
 import os
 import copy
+import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -17,6 +18,8 @@ from torch_geometric.nn import GCNConv
 # References
 # RvNN - https://github.com/majingCUHK/Rumor_RvNN
 # BiGCN - https://github.com/TianBian95/BiGCN/
+# Self-Attention - https://github.com/CyberZHG/torch-multi-head-attention/blob/master/torch_multi_head_attention/multi_head_attention.py
+
 
 class TDRumorGCN(nn.Module):
     def __init__(self, in_feats, hid_feats, out_feats):
@@ -106,9 +109,10 @@ class Network(nn.Module):
 
         Network.snapshot_num = settings['snapshot_num']
         Network.device = settings['cuda']
+        Network.learning_sequence = settings['learning_sequence']
 
         self.rumor_GCN_0 = BiGCN(in_feats, hid_feats, out_feats)
-        self.W_s1 = nn.Linear(out_feats * 2 * 4, 1)
+        self.W_s1 = nn.Linear(out_feats * 2 * 4, 1)  # additive attention
         self.fc = nn.Linear((out_feats + hid_feats) * 2 * 2, 4)
         self.init_weights()
 
@@ -120,7 +124,7 @@ class Network(nn.Module):
         init.xavier_normal_(self.W_s1.weight)
         init.xavier_normal_(self.fc.weight)
 
-    def attention_module(self, x, x_context):  # (Additive Attention)
+    def additive_attention(self, x, x_context):  # additive attention
         attn_w = []
         for current_x in x:
             attn_w.append(self.W_s1(torch.cat((current_x, x_context), 1)))
@@ -133,18 +137,40 @@ class Network(nn.Module):
                 attn_weights[:, index].unsqueeze(1).unsqueeze(2)
             )
             updated_x.append(weighted_x)
+        updated_x = torch.stack(updated_x, 1)
         return updated_x
+
+    def self_attention(self, query, key, value, mask=None):  # Self-Attention
+        dk = query.size()[-1]  # 256
+        scores = query.matmul(key.transpose(-2, -1)) / math.sqrt(dk)
+        # if mask is not None:
+        #     scores = scores.masked_fill(mask == 0, -1e9)
+        attention = F.softmax(scores, dim=-1)
+        return attention.matmul(value)
+
+    def attention_module(self, x_stack):
+        # MEAN
+        # LSTM, GRU
+        # self-attention
+
+        if Network.learning_sequence == "additive":
+            x_mean = x_stack.mean(dim=1)
+            x_stack = self.additive_attention(x_stack, x_mean)  # query: context
+        elif Network.learning_sequence == "dot_product":
+            x_stack = self.self_attention(x_stack, x_stack, x_stack)
+        else:
+            pass
+
+        return x_stack
 
     def forward(self, snapshots):
         x = []
         for s in snapshots:
             x.append(self.rumor_GCN_0(s))
 
-        x_stack = torch.stack(x, 1)
-        x_mean = x_stack.mean(dim=1)
-        x = self.attention_module(x, x_mean)  # query: context vector
+        x_stack = torch.stack(x, 1)  # B x S x D - E.g.: (20, 3, 256)
+        x_stack = self.attention_module(x_stack)
 
-        x_stack = torch.stack(x, 1)
         x_mean = x_stack.mean(dim=1)  # mean pooling (nodes -> graph)
         x_max = torch.max(x_stack, dim=1)[0]  # max pooling (nodes -> graph)
         x_cat = torch.cat((x_mean, x_max), 1).squeeze(2)
