@@ -69,13 +69,14 @@ def load_resource_trees(path):
 def load_resource_labels_weibo(path):  # Weibo Dataset
     id_label_dict = {}
     label_id_dict = {'0': [], '1': []}
-    # num_labels = {'true': 0, 'false': 1}
+    num_labels = {'0': 0, '1': 1}
     for line in open(path):
         elements = line.strip().split(' ')
         label, event_id = elements[1], elements[0]
         id_label_dict[event_id] = label
         label_id_dict[label].append(event_id)
-
+    for key in id_label_dict.keys():
+        id_label_dict[key] = num_labels[id_label_dict[key]]
     print("PATH: {0}, LEN: {1}".format(path, len(id_label_dict)))
     print([(key, len(label_id_dict[key])) for key in label_id_dict])
     return id_label_dict, label_id_dict
@@ -310,7 +311,7 @@ def main():
         edge_index = sequence_to_snapshot_index(sequential_info, snapshot_num)
         save_json_file(paths['sequential_snapshots'], edge_index)
 
-    elif dataset in ['Pheme']:
+    elif dataset in ['Pheme']:  # TODO:
         # --------------------------
         #         INIT PATHS
         # --------------------------

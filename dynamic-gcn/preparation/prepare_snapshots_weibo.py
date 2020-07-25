@@ -268,7 +268,7 @@ def main():
 
         paths['resource_label'] = './resources/{0}/weibo_id_label.txt'.format(dataset)
         paths['resource_tree'] = './resources/{0}/weibotree.txt'.format(dataset)
-        paths['resource_tree_cache'] = './resources/{0}/weibotree_cache.txt'.format(dataset)
+        paths['resource_tree_cache'] = './resources/{0}/weibotree_cache.json'.format(dataset)
         paths['timestamps'] = './data/timestamps/{}/timestamps.txt'.format(dataset)
         paths['sequential_snapshots'] = './data/timestamps/{}/sequential_snapshots_{:02}.txt'.format(dataset, snapshot_num)
         paths['snapshot_index'] = './data/timestamps/{}/{}_snapshots_{:02}.txt'.format(dataset, dataset_type, snapshot_num)
@@ -283,11 +283,10 @@ def main():
 
     id_label_dict, _ = load_labels(paths['resource_label'])
     sequences_dict = load_json_file(paths['snapshot_index'])
-    save_json_file(paths['timestamps_raw'], sequences_dict)
 
     trees_dict = load_snapshot_trees_weibo(paths, id_label_dict, sequences_dict, snapshot_num)
-    save_json_file(paths['timestamps_raw'], trees_dict)
-    # trees_dict = load_json_file(paths['timestamps_raw'])  # cache
+    save_json_file(paths['resource_tree_cache'], trees_dict)
+    # trees_dict = load_json_file(paths['resource_tree_cache'])  # cache
 
     ensure_directory(paths['graph'])
 

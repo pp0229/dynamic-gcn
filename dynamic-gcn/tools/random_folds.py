@@ -107,8 +107,7 @@ def count_train_val_test_labels(id_label_dict, fold_x_train, fold_x_val, fold_x_
     counts = {'train': [], 'validation': [], 'test': []}
     for label_num in range(4):  # class count
         counts['train'].append(sum(value == label_num for value in train_list))
-        counts['validation'].append(
-            sum(value == label_num for value in val_list))
+        counts['validation'].append(sum(value == label_num for value in val_list))
         counts['test'].append(sum(value == label_num for value in test_list))
     return counts
 

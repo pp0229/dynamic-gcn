@@ -56,10 +56,14 @@ class TDRumorGCN(nn.Module):
         x = torch.cat((x, root_extend), 1)
 
         # READOUT LAYER: mean, max pooling (nodes -> graph)
+        """
         x_mean = scatter_mean(x, data.batch, dim=0)  # B x 64
         x_max = scatter_max(x, data.batch, dim=0)[0]  # B x 64
         x = torch.cat((x_mean, x_max), 1)  # CONCAT(mean, max)
         return x  # B x 128
+        """
+        x_mean = scatter_mean(x, data.batch, dim=0)  # B x 64
+        return x_mean
 
 
 class BURumorGCN(nn.Module):
@@ -93,10 +97,14 @@ class BURumorGCN(nn.Module):
         x = torch.cat((x, root_extend), 1)
 
         # READOUT LAYER: mean, max pooling (nodes -> graph)
+        """
         x_mean = scatter_mean(x, data.batch, dim=0)  # B x 64
         x_max = scatter_max(x, data.batch, dim=0)[0]  # B x 64
         x = torch.cat((x_mean, x_max), 1)  # CONCAT(mean, max)
         return x  # B x 128
+        """
+        x_mean = scatter_mean(x, data.batch, dim=0)  # B x 64
+        return x_mean
 
 
 class BiGCN(nn.Module):
@@ -123,7 +131,9 @@ class Network(nn.Module):
 
         self.rumor_GCN_0 = BiGCN(in_feats, hid_feats, out_feats)
         self.W_s1 = nn.Linear(out_feats * 2 * 4, 1)  # additive attention
-        self.fc = nn.Linear((out_feats + hid_feats) * 2 * 2, 4)
+        self.fc = nn.Linear((out_feats + hid_feats) * 2, 4)
+        # self.fc = nn.Linear((out_feats + hid_feats) * 2 * 2, 4)
+        # self.fc = nn.Linear((out_feats + hid_feats) * 2 * 4, 4)
         self.init_weights()
 
     def init_weights(self):  # Xavier Init
@@ -189,7 +199,7 @@ class Network(nn.Module):
         #     scores = scores.masked_fill(mask == 0, -1e9)
         attention = F.softmax(scores, dim=-1)
 
-        self.append_results(attention.data)  # batch average
+        # self.append_results(attention.data)  # batch average  # TODO:
 
         return attention.matmul(value)
 
@@ -238,5 +248,6 @@ class Network(nn.Module):
         # FC LAYER
         # x = self.fc(x_mean)
         x = self.fc(x_mean)
+        # x = self.fc(x_cat)
         x = F.log_softmax(x, dim=1)
         return x

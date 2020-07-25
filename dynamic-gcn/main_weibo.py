@@ -12,11 +12,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.data import DataLoader
 
-from preparation.preprocess_dataset import load_resource_labels
-from preparation.preprocess_dataset import load_resource_trees
+# from preparation.preprocess_dataset import load_resource_labels
+# from preparation.preprocess_dataset import load_resource_trees
 
-# from preparation.preprocess_dataset import load_resource_labels_weibo as load_resource_labels
-# from preparation.preprocess_dataset import load_resource_trees_weibo as load_resource_trees
+from preparation.preprocess_dataset import load_resource_labels_weibo as load_resource_labels
+from preparation.preprocess_dataset import load_resource_trees_weibo as load_resource_trees
 
 from tools.random_folds import load_k_fold_train_val_test
 from tools.random_folds import print_folds_labels
