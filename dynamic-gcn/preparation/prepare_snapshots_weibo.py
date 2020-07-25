@@ -155,17 +155,18 @@ class TweetTree(object):
         for j in tree_dict:
             child_index = j
             child_node = index2node[child_index]
-            word_index, word_frequency = self.str2matrix(
-                tree_dict[j]['word_features'])
+            word_index, word_frequency = self.str2matrix(tree_dict[j]['word_features'])
             child_node.word_index = word_index
             child_node.word_frequency = word_frequency
             parent_index = tree_dict[j]['parent_index']
             if parent_index == 'None':  # root post
-                root_index = child_index - 1
+                # root_index = child_index - 1
+                root_index = int(child_index) - 1  # json dump
                 root_word_index = child_node.word_index
                 root_word_frequency = child_node.word_frequency
             else:  # responsive post
-                parent_node = index2node[int(parent_index)]
+                # parent_node = index2node[int(parent_index)]
+                parent_node = index2node[parent_index]  # json dump
                 child_node.parent = parent_node
                 parent_node.children.append(child_node)
         root_features = np.zeros([1, 5000])
@@ -186,8 +187,10 @@ class TweetTree(object):
             for child_node in index2node[index_i].children:
                 child_index.append(child_node.index)
             for index_j in sorted(child_index):
-                row.append(index_i-1)
-                col.append(index_j-1)
+                # row.append(index_i-1)
+                # col.append(index_j-1)
+                row.append(int(index_i)-1)  # json dump
+                col.append(int(index_j)-1)
         edge_matrix = [row, col]  # TODO: shift
         # shift indices
         # - new adjacency matrix for PyTorch Geometric
@@ -196,8 +199,10 @@ class TweetTree(object):
         for i in sorted(set(row).union(set(col))):
             index_map[i] = shifted_index
             shifted_index += 1
-            x_word_index_list.append(index2node[i+1].word_index)
-            x_word_frequency_list.append(index2node[i+1].word_frequency)
+            # x_word_index_list.append(index2node[i+1].word_index)
+            # x_word_frequency_list.append(index2node[i+1].word_frequency)
+            x_word_index_list.append(index2node[str(i+1)].word_index)
+            x_word_frequency_list.append(index2node[str(i+1)].word_frequency)  # json dump
         new_row = []
         new_col = []
         for row_elem in row:
@@ -217,6 +222,13 @@ class TweetTree(object):
         x_x = np.zeros([len(x_word_index_list), 5000])
         for i in range(len(x_word_index_list)):
             if len(x_word_index_list[i]) > 0:
+
+                print("HERE")
+                print(np.array(x_word_index_list[i]).shape)
+                print(np.array(x_word_frequency_list[i]).shape)
+                print(x_x.shape)
+                print(i)
+
                 x_x[i, np.array(x_word_index_list[i])] = np.array(x_word_frequency_list[i])
         self.x_x = x_x
 
@@ -282,11 +294,11 @@ def main():
     # ----------------------------------
 
     id_label_dict, _ = load_labels(paths['resource_label'])
-    sequences_dict = load_json_file(paths['snapshot_index'])
 
-    trees_dict = load_snapshot_trees_weibo(paths, id_label_dict, sequences_dict, snapshot_num)
-    save_json_file(paths['resource_tree_cache'], trees_dict)
-    # trees_dict = load_json_file(paths['resource_tree_cache'])  # cache
+    # sequences_dict = load_json_file(paths['snapshot_index'])
+    # trees_dict = load_snapshot_trees_weibo(paths, id_label_dict, sequences_dict, snapshot_num)
+    # save_json_file(paths['resource_tree_cache'], trees_dict)
+    trees_dict = load_json_file(paths['resource_tree_cache'])  # cache
 
     ensure_directory(paths['graph'])
 
@@ -298,19 +310,27 @@ def main():
         if event_id not in trees_dict:
             continue
 
-        if len(trees_dict[event_id][0]) < 2:  # no responsive post
+        if event_id not in [
+            '3501902090262385','3907580407356244', '3907742282069764', '3909081075061253',
+            '3909155720971721', '3914408365363135', '3684095995971132', '3466379833885944',
+            '3500947630475466', '3523166905046601', '3547825524904328']:
+            continue
+
+
+        if len(trees_dict[event_id]['0']) < 2:  # '0' after json load
             print("no responsive post", event_id, len(trees_dict[event_id][0]))
             continue
-        """
+
         for snapshot_index in range(snapshot_num):
             TweetTree(
                 paths['graph'],
                 event_id,
                 id_label_dict[event_id],
-                trees_dict[event_id][snapshot_index],
+                trees_dict[event_id][str(snapshot_index)],
                 snapshot_index,
                 snapshot_num,
             )
+
         """
         try:
             if len(trees_dict[event_id][0]) < 2:  # no responsive post
@@ -330,6 +350,7 @@ def main():
             error_list.append(event_id)
             # 11 ERRORS
             # ['3501902090262385', '3907580407356244', '3907742282069764', '3909081075061253', '3909155720971721', '3914408365363135', '3684095995971132', '3466379833885944', '3500947630475466', '3523166905046601', '3547825524904328']
+        """
 
 
     print

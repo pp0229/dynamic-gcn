@@ -32,7 +32,7 @@ from utils import append_json_file
 from utils import load_json_file
 from utils import ensure_directory
 
-from model import Network  # GCN (ICLR 2017) ++
+from model_weibo import Network  # GCN (ICLR 2017) ++
 
 
 def append_results(string):  # TODO:
@@ -49,7 +49,7 @@ parser.add_argument('--learning-sequence', '-ls', type=str, help='additive, dot_
 parser.add_argument('--dataset-name', '-dn', type=str, help='Twitter15, Twitter16')
 parser.add_argument('--dataset-type', '-dt', type=str, help='sequential, temporal')
 parser.add_argument('--snapshot-num', '-sn', type=int, help='2, 3, 5, ...')
-parser.add_argument('--cuda', '-c', type=str, default='cuda:1', help='cuda:3')
+parser.add_argument('--cuda', '-c', type=str, default='cuda:2', help='cuda:3')
 args = parser.parse_args()
 print(args)
 
@@ -93,6 +93,8 @@ if dataset_name == 'Weibo':
 iterations = 10
 num_epochs = 200
 batch_size = 20
+# batch_size = 10
+# batch_size = 2
 lr = 0.0005
 weight_decay = 1e-4
 patience = 10
@@ -113,18 +115,27 @@ append_results(settings)  # Dev
 counters = {'iter': 0, 'CV': 0}
 
 
+# TODO:
+remove_list = ['3501902090262385', '3907580407356244', '3907742282069764', '3909081075061253', '3909155720971721', '3914408365363135', '3684095995971132', '3466379833885944', '3500947630475466', '3523166905046601', '3547825524904328']
+
 # Train: with DropEdge
 def load_snapshot_dataset_train(dataset_name, tree_dict, fold_x_train):
+
+    fold_x_train = [x for x in fold_x_train if x not in remove_list]
+
     data_path = "./data/graph/{0}/{1}_snapshot".format(dataset_name, dataset_type)
     train_dataset = GraphSnapshotDataset(
         tree_dict, fold_x_train, data_path=data_path, snapshot_num=snapshot_num,
-        td_droprate=td_droprate, bu_droprate=bu_droprate,  # stochastic
+        td_droprate=0, bu_droprate=0,  # weibo without dropedge - stochastic (x)
     )
     print("train count:", len(train_dataset))
     return train_dataset
 
 # Inference: without DropEdge
 def load_snapshot_dataset_val_or_test(dataset_name, tree_dict, fold_x_val_or_test):
+
+    fold_x_val_or_test = [x for x in fold_x_val_or_test if x not in remove_list]
+
     data_path = "./data/graph/{0}/{1}_snapshot".format(dataset_name, dataset_type)
     val_or_test_dataset = GraphSnapshotDataset(
         tree_dict, fold_x_val_or_test, data_path=data_path, snapshot_num=snapshot_num
@@ -164,6 +175,9 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
     early_stopping = EarlyStopping(patience=patience, verbose=True, model_path=MODEL_PATH)
 
 
+    # without dropedge
+    train_dataset = load_snapshot_dataset_train(dataset_name, tree_dict, x_train)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=5)
 
     val_dataset = load_snapshot_dataset_val_or_test(dataset_name, tree_dict, x_val)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=5)
@@ -178,8 +192,6 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
 
         with torch.cuda.device(device):
             torch.cuda.empty_cache()  # TODO: CHECK
-        train_dataset = load_snapshot_dataset_train(dataset_name, tree_dict, x_train)
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=5)
 
         # TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: 
         # del train_dataset
@@ -194,6 +206,10 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
         batch_train_accuracies = []
 
         for batch_index, batch_data in enumerate(train_loader):
+
+            with torch.cuda.device(device):
+                torch.cuda.empty_cache()  # TODO: CHECK
+
             snapshots = []
             for i in range(snapshot_num):
                 snapshots.append(batch_data[i].to(device))
@@ -217,14 +233,16 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
 
             batch_train_losses.append(batch_train_loss)
             batch_train_accuracies.append(batch_train_acc)
-            print("Iter {:02d} | CV {:02d} | Epoch {:03d} | Batch {:02d} | Train_Loss {:.4f} | Train_Accuracy {:.4f}".format(
+            print("Iter {:02d} | CV {:02d} | Epoch {:03d} | Batch {:03d} | Train_Loss {:.4f} | Train_Accuracy {:.4f}".format(
                 counters['iter'], counters['CV'], epoch, batch_index, batch_train_loss, batch_train_acc))
+
+            del batch_data
 
         train_losses.append(np.mean(batch_train_losses))  # epoch
         train_accuracies.append(np.mean(batch_train_accuracies))
 
-        del train_dataset
-        del train_loader
+        # del train_dataset
+        # del train_loader
 
         # ------------------------
         #         VALIDATE
@@ -280,6 +298,9 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
             model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
             model.to(device)
             break
+
+    del train_dataset
+    del train_loader
 
     del val_dataset
     del val_loader
