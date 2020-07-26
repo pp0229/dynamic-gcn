@@ -164,6 +164,14 @@ class Network(nn.Module):
 
     # TODO: REFACTORING
 
+
+    # TODO: remove "TEMPORAL"
+    def append_results(self, string):  # TODO:
+        with open("./attention.txt", 'a') as out_file:
+            out_file.write(str(string) + '\n')
+
+
+
     # TODO: TODO: TODO: TODO: TODO:
     def additive_attention(self, x_stack):  # TODO:
         x_context = x_stack.mean(dim=1)  # x_mean
@@ -185,11 +193,6 @@ class Network(nn.Module):
             updated_x.append(weighted_x)
         updated_x = torch.stack(updated_x, 1)
         return updated_x
-
-    # TODO: remove "TEMPORAL"
-    def append_results(self, string):  # TODO:
-        with open("./attention.txt", 'a') as out_file:
-            out_file.write(str(string) + '\n')
 
 
     def dot_product_attention(self, query, key, value, mask=None):  # self-attention

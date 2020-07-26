@@ -45,8 +45,8 @@ def append_results(string):  # TODO:
 # -------------------------------
 parser = argparse.ArgumentParser(description='argparse')
 parser.add_argument('--model', '-m', type=str, default='GCN', help='GCN, GraphSAGE, GIN')
-parser.add_argument('--learning-sequence', '-ls', type=str, help='additive, dot_product')
-parser.add_argument('--dataset-name', '-dn', type=str, help='Twitter15, Twitter16')
+parser.add_argument('--learning-sequence', '-ls', type=str, help='additive, dot_product, mean')
+parser.add_argument('--dataset-name', '-dn', type=str, help='Twitter15, Twitter16, Weibo')
 parser.add_argument('--dataset-type', '-dt', type=str, help='sequential, temporal')
 parser.add_argument('--snapshot-num', '-sn', type=int, help='2, 3, 5, ...')
 parser.add_argument('--cuda', '-c', type=str, default='cuda:1', help='cuda:3')

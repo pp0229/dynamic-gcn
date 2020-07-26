@@ -36,6 +36,7 @@ python ./dynamic-gcn/preparation/prepare_snapshots.py Twitter15 temporal 3
 
 
 
+
 echo "----------------------------"
 echo "        TRAIN & TEST        "
 echo "----------------------------"
@@ -54,5 +55,34 @@ python ./dynamic-gcn/main.py -m GCN -ls dot_product -dn Twitter16 -dt sequential
 
 
 
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter16 --dataset-type sequential --snapshot-num 3
+
+
 python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
     --dataset-name Twitter16 --dataset-type sequential --snapshot-num 3
+
+
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
+    --dataset-name Twitter16 --dataset-type temporal --snapshot-num 3 --cuda cuda:0
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
+    --dataset-name Twitter15 --dataset-type sequential --snapshot-num 3 --cuda cuda:1
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
+    --dataset-name Twitter15 --dataset-type temporal --snapshot-num 3 --cuda cuda:2
+
+# TODO:
+
+# -------------------------------------
+# WEIBO
+# -------------------------------------
+
+python ./dynamic-gcn/preparation/preprocess_dataset.py Weibo 3
+python ./dynamic-gcn/preparation/prepare_snapshots_weibo.py Weibo sequential 3
+
+python ./dynamic-gcn/main_weibo.py --model GCN --learning-sequence dot_product \
+    --dataset-name Weibo --dataset-type sequential --snapshot-num 3
+
+# 

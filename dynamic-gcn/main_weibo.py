@@ -49,7 +49,7 @@ parser.add_argument('--learning-sequence', '-ls', type=str, help='additive, dot_
 parser.add_argument('--dataset-name', '-dn', type=str, help='Twitter15, Twitter16')
 parser.add_argument('--dataset-type', '-dt', type=str, help='sequential, temporal')
 parser.add_argument('--snapshot-num', '-sn', type=int, help='2, 3, 5, ...')
-parser.add_argument('--cuda', '-c', type=str, default='cuda:2', help='cuda:3')
+parser.add_argument('--cuda', '-c', type=str, default='cuda:3', help='cuda:3')
 args = parser.parse_args()
 print(args)
 
@@ -92,9 +92,11 @@ if dataset_name == 'Weibo':
 # -------------------------------
 iterations = 10
 num_epochs = 200
+num_epochs = 2  # TODO:
 batch_size = 20
 # batch_size = 10
 # batch_size = 2
+batch_size = 1
 lr = 0.0005
 weight_decay = 1e-4
 patience = 10
@@ -115,8 +117,11 @@ append_results(settings)  # Dev
 counters = {'iter': 0, 'CV': 0}
 
 
-# TODO:
+# TODO: Weibo
 remove_list = ['3501902090262385', '3907580407356244', '3907742282069764', '3909081075061253', '3909155720971721', '3914408365363135', '3684095995971132', '3466379833885944', '3500947630475466', '3523166905046601', '3547825524904328']
+large_files = ['3475816099213996', '3476001294281594', '3501712684038955', '3551685860964318', '3558607675129825', '3574311804066048', '3574613797373183', '3911258988203932', '3918798316397729']
+# remove_list.extend(large_files)
+remove_list += large_files
 
 # Train: with DropEdge
 def load_snapshot_dataset_train(dataset_name, tree_dict, fold_x_train):
@@ -227,16 +232,21 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
             optimizer.step()
 
             batch_train_loss = loss.item()
+
             _, pred = out_labels.max(dim=-1)
             correct = pred.eq(batch_data[0].y).sum().item()
             batch_train_acc = correct / len(batch_data[0].y)
 
             batch_train_losses.append(batch_train_loss)
             batch_train_accuracies.append(batch_train_acc)
-            print("Iter {:02d} | CV {:02d} | Epoch {:03d} | Batch {:03d} | Train_Loss {:.4f} | Train_Accuracy {:.4f}".format(
+            print("Iter {:02d} | CV {:02d} | Epoch {:03d} | Batch {:04d} | Train_Loss {:.4f} | Train_Accuracy {:.4f}".format(
                 counters['iter'], counters['CV'], epoch, batch_index, batch_train_loss, batch_train_acc))
 
+
+            batch_data = None
+            loss = None
             del batch_data
+            del loss
 
         train_losses.append(np.mean(batch_train_losses))  # epoch
         train_accuracies.append(np.mean(batch_train_accuracies))
@@ -256,6 +266,10 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
         # with torch.no_grad():
 
         for batch_data in val_loader:
+
+            with torch.cuda.device(device):
+                torch.cuda.empty_cache()  # TODO: CHECK
+
             snapshots = []
             for i in range(snapshot_num):
                 snapshots.append(batch_data[i].to(device))
@@ -272,6 +286,12 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
             batch_val_losses.append(batch_val_loss)
             batch_val_accuracies.append(batch_val_acc)
             batch_eval_results.append(evaluation(val_pred, batch_data[0].y))
+
+
+            batch_data = None
+            val_loss = None
+            del batch_data
+            del val_loss
 
         validation_losses.append(np.mean(batch_val_losses))
         validation_accuracies.append(np.mean(batch_val_accuracies))
@@ -320,6 +340,11 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
 
     model.eval()
     for batch_data in test_loader:
+
+        with torch.cuda.device(device):
+            torch.cuda.empty_cache()  # TODO: CHECK
+
+
         snapshots = []
         for i in range(snapshot_num):
             snapshots.append(batch_data[i].to(device))
@@ -338,6 +363,11 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
         batch_test_losses.append(batch_test_loss)
         batch_test_accuracies.append(batch_test_acc)
         batch_test_eval_results.append(evaluation(test_pred, batch_data[0].y))
+
+        batch_data = None
+        test_loss = None
+        del batch_data
+        del test_loss
 
     test_losses.append(np.mean(batch_test_losses))
     test_accuracies.append(np.mean(batch_test_accuracies))
