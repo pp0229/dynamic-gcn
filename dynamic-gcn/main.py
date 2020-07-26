@@ -65,7 +65,7 @@ current = datetime.datetime.now().strftime("%Y_%m%d_%H%M")
 #         Validate Inputs
 # -------------------------------
 assert model in ['GCN']
-assert learning_sequence in ['additive', 'dot_product']
+assert learning_sequence in ['additive', 'dot_product', 'mean']
 assert dataset_name in ['Twitter15', 'Twitter16', 'Weibo']
 assert dataset_type in ['sequential', 'temporal']
 assert snapshot_num in [2, 3, 5]

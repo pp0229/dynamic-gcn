@@ -73,7 +73,20 @@ python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
 python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
     --dataset-name Twitter15 --dataset-type temporal --snapshot-num 3 --cuda cuda:2
 
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence mean \
+    --dataset-name Twitter16 --dataset-type sequential --snapshot-num 3 --cuda cuda:1
+
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence mean \
+    --dataset-name Twitter16 --dataset-type temporal --snapshot-num 3 --cuda cuda:2
+
+
 # TODO:
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter16 --dataset-type sequential --snapshot-num 3 --cuda cuda:0
+
+
 
 # -------------------------------------
 # WEIBO

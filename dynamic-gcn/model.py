@@ -171,24 +171,23 @@ class Network(nn.Module):
 
 
     # TODO: TODO: TODO: TODO: TODO:
-    def additive_attention(self, x_stack):  # TODO:
-        x_context = x_stack.mean(dim=1)  # x_mean
+    def additive_attention(self, x):  # TODO:
+        x_stack = torch.stack(x, 1)  # B * S * 256
+        x_context = x_stack.mean(dim=1)  # B * S
 
-        # (20, 3, 256) -> (20, 3, 512)
-        self.W_s1(torch.cat((current_x, x_context), 1))
-
+        # TODO: BATCH PARALLEL
         attn_w = []
         for current_x in x:
-            attn_w.append()
-        attn_weights = torch.cat((attn_w), 1)  # B x 5
-        attn_weights = F.softmax(attn_weights, dim=1)
+            attn_w.append(self.W_s1(torch.cat((current_x, x_context), 1)))
+        attn_weights = torch.cat((attn_w), 1)  # B * S
+        attn_weights = F.softmax(attn_weights, dim=1)  # B * S
         updated_x = []
         for index, current_x in enumerate(x):
             weighted_x = torch.bmm(
-                current_x.unsqueeze(2),
-                attn_weights[:, index].unsqueeze(1).unsqueeze(2)
+                current_x.unsqueeze(2),  # B * 256 * 1
+                attn_weights[:, index].unsqueeze(1).unsqueeze(2)  # B * 1 * 1
             )
-            updated_x.append(weighted_x)
+            updated_x.append(weighted_x.squeeze(2))
         updated_x = torch.stack(updated_x, 1)
         return updated_x
 
@@ -201,30 +200,44 @@ class Network(nn.Module):
         attention = F.softmax(scores, dim=-1)
 
         # self.append_results(attention.data)  # batch average  # TODO:
-
         return attention.matmul(value)
 
     # TODO: REFACTORING
 
-    def attention_module(self, x_stack):
+    def attention_module(self, x):
         # Batch x Seq x Embedding - E.g.: (20, 3, 256)
 
         if Network.learning_sequence == "mean":
-            pass
+            x_stack = torch.stack(x, 1)  # B x S x D - E.g.: (20, 3, 256)
+            x = x_stack.mean(dim=1)
+
+        elif Network.learning_sequence == "mean_max":
+            x_stack = torch.stack(x, 1)  # B x S x D - E.g.: (20, 3, 256)
+            x_mean = x_stack.mean(dim=1)
+            x_max = torch.max(x_stack, dim=1)[0]
+            x = torch.cat((x_mean, x_max), 1)  # CONCAT(mean, max)
+
         elif Network.learning_sequence == "additive":
-            x_stack = self.additive_attention(x_stack)
+            x_stack = self.additive_attention(x)
+            x = x_stack.mean(dim=1)
+
         elif Network.learning_sequence == "dot_product":
+            x_stack = torch.stack(x, 1)  # B x S x D - E.g.: (20, 3, 256)
             x_stack = self.dot_product_attention(x_stack, x_stack, x_stack)
+            x = x_stack.mean(dim=1)
+
         elif Network.learning_sequence == "LSTM":
             pass
+
         elif Network.learning_sequence == "GRU":
             pass
+
         else:
             # MEAN
             # LSTM, GRU
             pass
 
-        return x_stack
+        return x
 
     def forward(self, snapshots):
 
@@ -234,11 +247,11 @@ class Network(nn.Module):
             x.append(self.rumor_GCN_0(s))
 
         # 4) ATTENTION LAYER
-        x_stack = torch.stack(x, 1)  # B x S x D - E.g.: (20, 3, 256)
-        x_stack = self.attention_module(x_stack)
+        x = self.attention_module(x)
+
         # x_sum = x_stack.sum(dim=1)
         # x_mean = x_stack.mean(dim=1)
-        x_mean = x_stack.mean(dim=1)
+        # x = x_stack.mean(dim=1)
 
         # TODO: TMUX 09
         # x_max = torch.max(x_stack, dim=1)[0]
@@ -248,7 +261,7 @@ class Network(nn.Module):
 
         # FC LAYER
         # x = self.fc(x_mean)
-        x = self.fc(x_mean)
+        x = self.fc(x)
         # x = self.fc(x_cat)
         x = F.log_softmax(x, dim=1)
         return x

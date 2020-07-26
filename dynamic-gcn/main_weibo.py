@@ -92,7 +92,7 @@ if dataset_name == 'Weibo':
 # -------------------------------
 iterations = 10
 num_epochs = 200
-num_epochs = 2  # TODO:
+num_epochs = 10  # TODO:
 batch_size = 20
 # batch_size = 10
 # batch_size = 2
@@ -100,6 +100,7 @@ batch_size = 1
 lr = 0.0005
 weight_decay = 1e-4
 patience = 10
+patience = 2  # TODO: weibo
 td_droprate = 0.2
 bu_droprate = 0.2
 device = torch.device(args.cuda if torch.cuda.is_available() else exit())
