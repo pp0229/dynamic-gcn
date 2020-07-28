@@ -8,6 +8,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
 
+torch.set_printoptions(precision=10)
+
 from torch_scatter import scatter_mean
 from torch_scatter import scatter_max
 from torch_geometric.data import DataLoader
@@ -124,7 +126,7 @@ class Network(nn.Module):
     # def __init__(self, in_feats, hid_feats, out_feats, snapshot_num, device):
     def __init__(self, in_feats, hid_feats, out_feats, settings):
         super(Network, self).__init__()
-
+        Network.settings = settings
         Network.snapshot_num = settings['snapshot_num']
         Network.device = settings['cuda']
         Network.learning_sequence = settings['learning_sequence']
@@ -144,11 +146,12 @@ class Network(nn.Module):
         init.xavier_normal_(self.W_s1.weight)
         init.xavier_normal_(self.fc.weight)
 
+
     def append_results(self, string):  # TODO:
-        with open("./attention.txt", 'a') as out_file:
+        with open("./attention_{}.json".format(str(Network.settings['current'])), 'a') as out_file:
             out_file.write(str(string) + '\n')
 
-    def additive_attention(self, x):  # TODO:
+    def additive_attention(self, x, print_attention=False):  # TODO:
         x_stack = torch.stack(x, 1)  # B * S * 256
         x_context = x_stack.mean(dim=1)  # B * S
 
@@ -167,21 +170,28 @@ class Network(nn.Module):
             )
             updated_x.append(weighted_x.squeeze(2))
         updated_x = torch.stack(updated_x, 1)
+
+        if print_attention:
+            self.append_results(attn_weights.tolist())
+
         return updated_x
 
 
-    def dot_product_attention(self, query, key, value, mask=None):  # self-attention
+    def dot_product_attention(self, query, key, value, print_attention=False):  # self-attention
         dk = query.size()[-1]  # 256
         scores = query.matmul(key.transpose(-2, -1)) / math.sqrt(dk)
         # if mask is not None:
         #     scores = scores.masked_fill(mask == 0, -1e9)
         attention = F.softmax(scores, dim=-1)
 
+        if print_attention:
+            self.append_results(attention.tolist())
+
         # self.append_results(attention.data)  # batch average  # TODO:
         return attention.matmul(value)
 
 
-    def attention_module(self, x):  # TODO: REFACTORING
+    def attention_module(self, x, print_attention):  # TODO: REFACTORING
         # x: Batch x Seq x Embedding - E.g.: (20, 5, 256)
 
         if Network.learning_sequence == "mean":
@@ -195,12 +205,12 @@ class Network(nn.Module):
             x = torch.cat((x_mean, x_max), 1)  # CONCAT(mean, max)
 
         elif Network.learning_sequence == "additive":
-            x_stack = self.additive_attention(x)
+            x_stack = self.additive_attention(x, print_attention)
             x = x_stack.mean(dim=1)
 
         elif Network.learning_sequence == "dot_product":
             x_stack = torch.stack(x, 1)  # B x S x D - E.g.: (20, 5, 256)
-            x_stack = self.dot_product_attention(x_stack, x_stack, x_stack)
+            x_stack = self.dot_product_attention(x_stack, x_stack, x_stack, print_attention)
             x = x_stack.mean(dim=1)
 
         elif Network.learning_sequence == "LSTM":
@@ -214,7 +224,7 @@ class Network(nn.Module):
 
         return x
 
-    def forward(self, snapshots):
+    def forward(self, snapshots, print_attention=False):
 
         # 2) GCN LAYERS + 3) READOUT LAYER
         x = []
@@ -222,7 +232,7 @@ class Network(nn.Module):
             x.append(self.rumor_GCN_0(s))
 
         # 4) ATTENTION LAYER
-        x = self.attention_module(x)
+        x = self.attention_module(x, print_attention)
 
         x = self.fc(x)
         x = F.log_softmax(x, dim=1)
