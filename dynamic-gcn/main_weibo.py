@@ -90,7 +90,7 @@ if dataset_name == 'Weibo':
 # -------------------------------
 #         Hyperparameters
 # -------------------------------
-iterations = 10
+iterations = 20
 num_epochs = 200
 num_epochs = 10  # TODO: weibo
 batch_size = 20

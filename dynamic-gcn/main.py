@@ -65,16 +65,17 @@ current = datetime.datetime.now().strftime("%Y_%m%d_%H%M")
 #         Validate Inputs
 # -------------------------------
 assert model in ['GCN']
-assert learning_sequence in ['additive', 'dot_product', 'mean']
 assert dataset_name in ['Twitter15', 'Twitter16', 'Weibo']
 assert dataset_type in ['sequential', 'temporal']
+assert learning_sequence in ['additive', 'dot_product', 'mean']
 assert snapshot_num in [2, 3, 5]
 
 
 # --------------------------
 #         INIT PATHS
 # --------------------------
-path_info = [model, dataset_name, dataset_type, learning_sequence, snapshot_num, current]
+# path_info = [model, dataset_name, dataset_type, learning_sequence, snapshot_num, current]  # DEPRECATED
+path_info = [model, learning_sequence, dataset_name, dataset_type, snapshot_num, current]
 ensure_directory("./results/")
 RESULTS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_results.txt".format(*path_info)
 FOLDS_FILE = "./results/{0}_{1}_{2}_{3}_{4}_{5}_folds.json".format(*path_info)
