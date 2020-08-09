@@ -68,7 +68,7 @@ assert model in ['GCN']
 assert dataset_name in ['Twitter15', 'Twitter16', 'Weibo']
 assert dataset_type in ['sequential', 'temporal']
 assert learning_sequence in ['additive', 'dot_product', 'mean']
-assert snapshot_num in [2, 3, 5]
+assert snapshot_num in [2, 3, 5, 10]
 
 
 # --------------------------

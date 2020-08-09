@@ -12,7 +12,8 @@
 '
 
 
-
+python ./dynamic-gcn/preparation/prepare_snapshots.py Twitter16 sequential 10
+python ./dynamic-gcn/preparation/prepare_snapshots.py Twitter16 temporal 10
 
 
 
@@ -34,6 +35,9 @@ python ./dynamic-gcn/preparation/prepare_snapshots.py Twitter15 sequential 3
 python ./dynamic-gcn/preparation/prepare_snapshots.py Twitter15 temporal 3
 
 
+
+python ./dynamic-gcn/preparation/prepare_snapshots.py Twitter15 sequential 5
+python ./dynamic-gcn/preparation/prepare_snapshots.py Twitter15 temporal 5
 
 
 
@@ -77,12 +81,104 @@ python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
 python ./dynamic-gcn/main.py --model GCN --learning-sequence mean \
     --dataset-name Twitter16 --dataset-type sequential --snapshot-num 3 --cuda cuda:1
 
-
 python ./dynamic-gcn/main.py --model GCN --learning-sequence mean \
     --dataset-name Twitter16 --dataset-type temporal --snapshot-num 3 --cuda cuda:2
 
 
+
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter16 --dataset-type sequential --snapshot-num 3 --cuda cuda:0
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter16 --dataset-type temporal --snapshot-num 3 --cuda cuda:0
+
+
+
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter16 --dataset-type sequential --snapshot-num 5 --cuda cuda:1
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
+    --dataset-name Twitter16 --dataset-type sequential --snapshot-num 5 --cuda cuda:0
+
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter16 --dataset-type temporal --snapshot-num 5 --cuda cuda:2
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
+    --dataset-name Twitter16 --dataset-type temporal --snapshot-num 5 --cuda cuda:2
+
+# TODO: 0728
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter15 --dataset-type sequential --snapshot-num 5 --cuda cuda:1
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
+    --dataset-name Twitter15 --dataset-type sequential --snapshot-num 5 --cuda cuda:1
+
+# TODO: 0728
+# TODO: 0728
+# TODO: 0728
+
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter15 --dataset-type temporal --snapshot-num 5 --cuda cuda:2
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
+    --dataset-name Twitter15 --dataset-type temporal --snapshot-num 5 --cuda cuda:2
+
+
+
+
 # TODO:
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter15 --dataset-type sequential --snapshot-num 3 --cuda cuda:1
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter15 --dataset-type temporal --snapshot-num 3 --cuda cuda:2
+
+
+
+# TODO:
+# TODO:
+
+# Attention
+
+# TODO:
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter16 --dataset-type sequential --snapshot-num 10 --cuda cuda:2
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
+    --dataset-name Twitter16 --dataset-type sequential --snapshot-num 10 --cuda cuda:3
+
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter16 --dataset-type temporal --snapshot-num 10 --cuda cuda:2
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
+    --dataset-name Twitter16 --dataset-type temporal --snapshot-num 10 --cuda cuda:3
+
+
+
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter15 --dataset-type sequential --snapshot-num 5 --cuda cuda:2
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
+    --dataset-name Twitter15 --dataset-type temporal --snapshot-num 5 --cuda cuda:2
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
+    --dataset-name Twitter15 --dataset-type sequential --snapshot-num 5 --cuda cuda:2
+
+python ./dynamic-gcn/main.py --model GCN --learning-sequence dot_product \
+    --dataset-name Twitter15 --dataset-type temporal --snapshot-num 5 --cuda cuda:2
+
+
+
+
 python ./dynamic-gcn/main.py --model GCN --learning-sequence additive \
     --dataset-name Twitter16 --dataset-type sequential --snapshot-num 3 --cuda cuda:0
 
