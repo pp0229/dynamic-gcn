@@ -15,12 +15,8 @@ from torch_geometric.data import DataLoader
 from preparation.preprocess_dataset import load_resource_labels
 from preparation.preprocess_dataset import load_resource_trees
 
-# from preparation.preprocess_dataset import load_resource_labels_weibo as load_resource_labels
-# from preparation.preprocess_dataset import load_resource_trees_weibo as load_resource_trees
-
 from tools.random_folds import load_k_fold_train_val_test
 from tools.random_folds import print_folds_labels
-
 from tools.early_stopping import EarlyStopping
 from tools.evaluation import evaluation
 from tools.evaluation import merge_batch_eval_list
@@ -97,8 +93,11 @@ batch_size = 20
 lr = 0.0005
 weight_decay = 1e-4
 patience = 10
-td_droprate = 0.2
-bu_droprate = 0.2
+
+drop_rate = 0.2  # DropEdge (ICLR 2020)
+td_droprate = drop_rate
+bu_droprate = drop_rate
+print("CUDA is required. CPU version is not supported...")
 device = torch.device(args.cuda if torch.cuda.is_available() else exit())
 # device = torch.device('cuda:3' if torch.cuda.is_available() else 'cpu')
 
@@ -114,27 +113,24 @@ append_results(settings)  # Dev
 counters = {'iter': 0, 'CV': 0}
 
 
-# Train: with DropEdge
-def load_snapshot_dataset_train(dataset_name, tree_dict, fold_x_train):
+def load_snapshot_dataset(dataset_name, tree_dict, fold_x, set_type="train"):
+    # Train: with DropEdge
+    # Inference (Test, Validation): without DropEdge
     data_path = "./data/graph/{0}/{1}_snapshot".format(dataset_name, dataset_type)
-    train_dataset = GraphSnapshotDataset(
-        tree_dict, fold_x_train, data_path=data_path, snapshot_num=snapshot_num,
-        td_droprate=td_droprate, bu_droprate=bu_droprate,  # stochastic
-    )
+    if set_type == "train":
+        train_dataset = GraphSnapshotDataset(
+            tree_dict, fold_x, data_path=data_path, snapshot_num=snapshot_num,
+            td_droprate=td_droprate, bu_droprate=bu_droprate,  # stochastic
+        )
+    elif set_type in ["test", "val", "validation"]:
+        train_dataset = GraphSnapshotDataset(
+            tree_dict, fold_x, data_path=data_path, snapshot_num=snapshot_num,
+        )
+    else:
+        print("check the dataset type")
+        exit()
     print("train count:", len(train_dataset))
     return train_dataset
-
-# Inference: without DropEdge
-def load_snapshot_dataset_val_or_test(dataset_name, tree_dict, fold_x_val_or_test):
-    data_path = "./data/graph/{0}/{1}_snapshot".format(dataset_name, dataset_type)
-    val_or_test_dataset = GraphSnapshotDataset(
-        tree_dict, fold_x_val_or_test, data_path=data_path, snapshot_num=snapshot_num
-    )
-    print("val or test count:", len(val_or_test_dataset))
-    return val_or_test_dataset
-
-
-
 
 
 def train_GCN(tree_dict, x_train, x_val, x_test, counters):
@@ -147,7 +143,6 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
     #     MODEL
     # -------------
     model = Network(5000, 64, 64, settings).to(device)
-
 
     # -----------------
     #     OPTIMIZER
@@ -164,28 +159,15 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
 
     early_stopping = EarlyStopping(patience=patience, verbose=True, model_path=MODEL_PATH)
 
-
-
-    val_dataset = load_snapshot_dataset_val_or_test(dataset_name, tree_dict, x_val)
+    val_dataset = load_snapshot_dataset(dataset_name, tree_dict, x_val, "val")
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=5)
 
     for epoch in range(num_epochs):
-        # train_dataset, val_dataset, test_dataset = load_snapshot_dataset(dataset_name, tree_dict, x_train, x_val, x_test)
-        # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=10)
-        # val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=5)  # TODO: move out epoch
-        # test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=5)
-
         # for dropedge
-
         with torch.cuda.device(device):
             torch.cuda.empty_cache()  # TODO: CHECK
-        train_dataset = load_snapshot_dataset_train(dataset_name, tree_dict, x_train)
+        train_dataset = load_snapshot_dataset(dataset_name, tree_dict, x_train, "train")
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=5)
-
-        # TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: 
-        # del train_dataset
-        # del train_loader
-        # TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: 
 
         # ---------------------
         #         TRAIN
@@ -193,29 +175,20 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
         model.train()
         batch_train_losses = []
         batch_train_accuracies = []
-
         for batch_index, batch_data in enumerate(train_loader):
             snapshots = []
             for i in range(snapshot_num):
                 snapshots.append(batch_data[i].to(device))
-
             out_labels = model(snapshots)
-
-
             loss = F.nll_loss(out_labels, batch_data[0].y)
             del snapshots
-            # nn.CrossEntropyLoss = nn.LogSoftmax + nn.NLLLoss
-            # loss = criterion(out_labels, batch_data[0].y)  # TODO:
-
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
             batch_train_loss = loss.item()
             _, pred = out_labels.max(dim=-1)
             correct = pred.eq(batch_data[0].y).sum().item()
             batch_train_acc = correct / len(batch_data[0].y)
-
             batch_train_losses.append(batch_train_loss)
             batch_train_accuracies.append(batch_train_acc)
             print("Iter {:02d} | CV {:02d} | Epoch {:03d} | Batch {:02d} | Train_Loss {:.4f} | Train_Accuracy {:.4f}".format(
@@ -223,7 +196,6 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
 
         train_losses.append(np.mean(batch_train_losses))  # epoch
         train_accuracies.append(np.mean(batch_train_accuracies))
-
         del train_dataset
         del train_loader
 
@@ -235,8 +207,6 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
         batch_eval_results = []
 
         model.eval()
-        # TODO: no_grad
-        # with torch.no_grad():
 
         for batch_data in val_loader:
             snapshots = []
@@ -270,11 +240,13 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
         # append_results("eval result: " + str(eval_result))
         append_results(
             "Iter {:03d} | CV {:02d} | Epoch {:05d} | Val_Loss {:.4f} | Val_Accuracy {:.4f}".format(
-                counters['iter'], counters['CV'], epoch, np.mean(batch_val_losses), np.mean(batch_val_accuracies)
+                counters['iter'], counters['CV'], epoch, np.mean(
+                    batch_val_losses), np.mean(batch_val_accuracies)
             )
         )
 
-        early_stopping(validation_losses[-1], model, 'BiGCN', dataset_name, validation_eval_result)
+        early_stopping(
+            validation_losses[-1], model, 'BiGCN', dataset_name, validation_eval_result)
         if early_stopping.early_stop:
             print("Early Stopping")
             validation_eval_result = early_stopping.eval_result
@@ -291,8 +263,9 @@ def train_GCN(tree_dict, x_train, x_val, x_test, counters):
 
     with torch.cuda.device(device):
         torch.cuda.empty_cache()  # TODO: CHECK
-    test_dataset = load_snapshot_dataset_val_or_test(dataset_name, tree_dict, x_test)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=5)
+    test_dataset = load_snapshot_dataset(dataset_name, tree_dict, x_test, "test")
+    test_loader = DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=True, num_workers=5)
 
     batch_test_losses = []  # epoch
     batch_test_accuracies = []
@@ -364,11 +337,16 @@ def main():
         fold3_x_train, fold3_x_val, fold3_x_test = folds[0][3], folds[1][3], folds[2][3]
         fold4_x_train, fold4_x_val, fold4_x_test = folds[0][4], folds[1][4], folds[2][4]
 
-        _, _, accs_f0, F1_f0 = train_GCN(tree_dict, fold0_x_train, fold0_x_val, fold0_x_test, counters)  # fold 0
-        _, _, accs_f1, F1_f1 = train_GCN(tree_dict, fold1_x_train, fold1_x_val, fold1_x_test, counters)  # fold 1
-        _, _, accs_f2, F1_f2 = train_GCN(tree_dict, fold2_x_train, fold2_x_val, fold2_x_test, counters)  # fold 2
-        _, _, accs_f3, F1_f3 = train_GCN(tree_dict, fold3_x_train, fold3_x_val, fold3_x_test, counters)  # fold 3
-        _, _, accs_f4, F1_f4 = train_GCN(tree_dict, fold4_x_train, fold4_x_val, fold4_x_test, counters)  # fold 4
+        _, _, accs_f0, F1_f0 = train_GCN(
+            tree_dict, fold0_x_train, fold0_x_val, fold0_x_test, counters)  # fold 0
+        _, _, accs_f1, F1_f1 = train_GCN(
+            tree_dict, fold1_x_train, fold1_x_val, fold1_x_test, counters)  # fold 1
+        _, _, accs_f2, F1_f2 = train_GCN(
+            tree_dict, fold2_x_train, fold2_x_val, fold2_x_test, counters)  # fold 2
+        _, _, accs_f3, F1_f3 = train_GCN(
+            tree_dict, fold3_x_train, fold3_x_val, fold3_x_test, counters)  # fold 3
+        _, _, accs_f4, F1_f4 = train_GCN(
+            tree_dict, fold4_x_train, fold4_x_val, fold4_x_test, counters)  # fold 4
 
         print("Test Accuracies (k-folds):", accs_f0, accs_f1, accs_f2, accs_f3, accs_f4)
         test_accs.append((accs_f0 + accs_f1 + accs_f2 + accs_f3 + accs_f4) / 5)
@@ -397,7 +375,6 @@ def main():
     print("\nINFO:", str(settings))
     print("Total Test Accuray: {:.4f} | TR_F1: {:.4f}, FR_F1: {:.4f}, UN_F1: {:.4f}, NR_F1: {:.4f}".format(*sums))
     append_results("Total Test Accuray: {:.4f} | TR_F1: {:.4f}, FR_F1: {:.4f}, UN_F1: {:.4f}, NR_F1: {:.4f}".format(*sums))
-
 
 
 print("=========================")
